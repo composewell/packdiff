@@ -1,0 +1,3 @@
+.packcheck.ignore
+.github/workflows/packcheck.yml
+cabal.project
