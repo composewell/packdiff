@@ -1,0 +1,17 @@
+packages: .
+
+source-repository-package
+   type: git
+   location: https://github.com/composewell/streamly-process.git
+   tag: c21c385b251ef640a399194e6cc24ea1ae92640f
+
+source-repository-package
+   type: git
+   location: https://github.com/composewell/streamly.git
+   tag: a12f957454a31b0b4979b9557ef19c9af632f195
+
+source-repository-package
+   type: git
+   location: https://github.com/composewell/streamly.git
+   tag: a12f957454a31b0b4979b9557ef19c9af632f195
+   subdir: core
