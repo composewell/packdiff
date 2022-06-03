@@ -38,6 +38,8 @@ library
                      , Pretty
   -- other-extensions:
   build-depends:       base       >= 4.10  && < 4.17
+                       -- We use internal modules of streamly.
+                       -- The bounds need to be fixed when releasing the package.
                      , streamly
                      , containers >= 0.6   && < 0.7
   hs-source-dirs:      src
@@ -48,7 +50,11 @@ executable packdiff
   main-is:             Main.hs
   -- other-extensions:
   build-depends:       base               >= 4.10  && < 4.17
+                       -- We use internal modules of streamly.
+                       -- The bounds need to be fixed when releasing the package.
                      , streamly
+                       -- We use internal modules of streamly-process.
+                       -- The bounds need to be fixed when releasing the package.
                      , streamly-process   >= 0.2.0 && < 0.3.0
                      , packdiff
   hs-source-dirs:      cli
