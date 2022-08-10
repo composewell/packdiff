@@ -39,18 +39,18 @@ prettyD0 = SMap.foldlWithKey step initial
 
     initial = []
 
-    step a k (Tagged Added b) = unwords ["[A]", k, ":", take 50 (showECT b)] : a
+    step a k (Tagged Added b) = unwords ["[A]", k, ":", showECT b] : a
     step a k (Tagged Removed b) =
-        unwords ["[R]", k, ":", take 50 (showECT b)] : a
-    -- step a k (Tagged Same b) = unwords ["[S]", k, ":", take 50 (showECT b)] : a
+        unwords ["[R]", k, ":", showECT b] : a
+    -- step a k (Tagged Same b) = unwords ["[S]", k, ":", showECT b] : a
     step a _ (Tagged Same _) = a
     step a k (Tagged (Changed b1) b) =
         concat
             [ [unwords ["[C]", k, ":"]]
             , indenter
                   4
-                  [ unwords ["[OLD]", take 50 (showECT b)]
-                  , unwords ["[NEW]", take 50 (showECT b1)]
+                  [ unwords ["[OLD]", showECT b]
+                  , unwords ["[NEW]", showECT b1]
                   ]
             , a
             ]
@@ -85,11 +85,18 @@ prettyMC ctx =
 
 prettyAPI ::
        Bool
+    -> Maybe Int
     -> API (StatusTag ()) (StatusTag ()) (StatusTag EntityContextType)
     -> String
-prettyAPI ignoreInternal = printer . SMap.foldlWithKey step initial
+prettyAPI ignoreInternal trunction =
+    printer . truncator . SMap.foldlWithKey step initial
 
     where
+
+    truncator =
+        case trunction of
+            Just t -> map (take t)
+            Nothing -> id
 
     initial = []
 

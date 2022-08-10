@@ -79,4 +79,4 @@ main = do
             & Stream.fold (haddockParseFold Removed Removed Removed)
     api2 <- fileToLines file2 & Stream.fold (haddockParseFold Added Added Added)
     step "Printing diff"
-    putStrLn $ prettyAPI False (diffAPI api1 api2)
+    putStrLn $ prettyAPI False Nothing (diffAPI api1 api2)
