@@ -7,11 +7,11 @@ module HoogleFileParser where
 import Data.Char (isUpper)
 import Data.List (isPrefixOf)
 import Data.Map (Map)
-import Streamly.Internal.Data.Fold (Fold)
+import Streamly.Data.Fold (Fold)
 
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as SMap
-import qualified Streamly.Internal.Data.Fold as Fold
+import qualified Streamly.Data.Fold as Fold
 
 --------------------------------------------------------------------------------
 -- Types

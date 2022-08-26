@@ -6,11 +6,11 @@ module Main (main) where
 
 import Control.Monad (when)
 import Data.Function ((&))
-import Streamly.Internal.Data.Stream.IsStream (SerialT)
+import Streamly.Prelude (SerialT)
 import System.Environment (getArgs)
 
-import qualified Streamly.Internal.Data.Fold as Fold
-import qualified Streamly.Internal.Data.Stream.IsStream as Stream
+import qualified Streamly.Data.Fold as Fold
+import qualified Streamly.Prelude as Stream
 import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.Unicode.Stream as Unicode
 import qualified Streamly.Internal.System.Command as Command
