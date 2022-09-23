@@ -6,11 +6,11 @@ module Main (main) where
 
 import Control.Monad (when)
 import Data.Function ((&))
-import Streamly.Prelude (SerialT)
+import Streamly.Data.Stream (Stream)
 import System.Environment (getArgs)
 
 import qualified Streamly.Data.Fold as Fold
-import qualified Streamly.Prelude as Stream
+import qualified Streamly.Data.Stream as Stream
 import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.Unicode.Stream as Unicode
 import qualified Streamly.Internal.System.Command as Command
@@ -50,7 +50,7 @@ generateHoogleFile target bd =
                 , "--haddock-hoogle"
                 , "--builddir=" ++ bd
                 ]
-     in Command.toLines Fold.toList cmd & Stream.last
+     in Command.toLines Fold.toList cmd & Stream.fold Fold.last
 
 checkoutAndGenerateHoogleFile  :: String -> String -> IO (Maybe String)
 checkoutAndGenerateHoogleFile target rev = do
@@ -58,10 +58,10 @@ checkoutAndGenerateHoogleFile target rev = do
     checkoutRevision rev
     generateHoogleFile target rev
 
-fileToLines :: String -> SerialT IO String
+fileToLines :: String -> Stream IO String
 fileToLines path =
     File.toChunks path & Unicode.decodeUtf8Arrays
-        & Stream.splitOn (== '\n') Fold.toList
+        & Stream.foldMany (Fold.takeEndBy_ (== '\n') Fold.toList)
 
 main :: IO ()
 main = do
