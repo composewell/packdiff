@@ -3,6 +3,8 @@
 dist/
 dist-newstyle*/
 
+.cabal.nix/
+
 # Local GHC and Cabal related files
 .ghc.environment*
 cabal.project.local

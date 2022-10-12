@@ -1,6 +1,8 @@
 module Diff
     ( StatusTag(..)
     , diffAPI
+    , diffModuleContext
+    , Diff(..)
     ) where
 
 --------------------------------------------------------------------------------
@@ -24,55 +26,74 @@ data StatusTag new
     | Same
     deriving (Eq, Ord)
 
+data Diff a
+    = DLeft a
+    | DRight a
+    | DBoth a a
+    deriving (Show)
+
+-- Left leaning diff
+mergeDiff :: Diff a -> Diff a -> Diff a
+mergeDiff (DLeft l) (DRight r) = DBoth l r
+mergeDiff l _ = l
+
+diffIsEq :: (a -> a -> Bool) -> Diff a -> Diff a -> Bool
+diffIsEq eq (DLeft l) (DRight r) = eq l r
+diffIsEq _ _ _ = undefined
+
+diffIsEqDoc :: Diff [Annotation] -> Diff [Annotation] -> Bool
+diffIsEqDoc l r = diffIsEq (==) l r
+
 --------------------------------------------------------------------------------
 -- Diffing
 --------------------------------------------------------------------------------
 
 diffStatusTaggedMap ::
        (Ord k)
-    => (Tagged (StatusTag n) v -> Tagged (StatusTag n) v -> Tagged (StatusTag n) v)
-    -> Map k (Tagged (StatusTag n) v)
-    -> Map k (Tagged (StatusTag n) v)
-    -> Map k (Tagged (StatusTag n) v)
+    => (Tagged t v -> Tagged t v -> Tagged t v)
+    -> Map k (Tagged t v)
+    -> Map k (Tagged t v)
+    -> Map k (Tagged t v)
 diffStatusTaggedMap unionFunction m1 m2 =
     SMap.unionWith unionFunction m1 m2
 
+-- Generalize the [Annotation] part by supplying a comparision function
 unionFunctionDepth0 ::
-       Tagged (StatusTag EntityContextType) EntityContextType
-    -> Tagged (StatusTag EntityContextType) EntityContextType
-    -> Tagged (StatusTag EntityContextType) EntityContextType
-unionFunctionDepth0 (Tagged _ v1) (Tagged _ v2) =
-    if v1 == v2
-    then Tagged Same v1
-    else Tagged (Changed v2) v1
+       Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType
+unionFunctionDepth0 (Tagged (Attach l _) v1) (Tagged (Attach r _) v2) =
+    if v1 /= v2 || not (diffIsEqDoc l r)
+    then Tagged (Attach (mergeDiff l r) (Changed v2)) v1
+    else Tagged (Attach (mergeDiff l r) Same) v1
 
 unionFunctionDepth1 ::
-       Tagged (StatusTag ()) (Map String (Tagged (StatusTag EntityContextType) EntityContextType))
-    -> Tagged (StatusTag ()) (Map String (Tagged (StatusTag EntityContextType) EntityContextType))
-    -> Tagged (StatusTag ()) (Map String (Tagged (StatusTag EntityContextType) EntityContextType))
-unionFunctionDepth1 (Tagged _ v1) (Tagged _ v2) =
+       Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType))
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType))
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType))
+unionFunctionDepth1 (Tagged (Attach l _) v1) (Tagged (Attach r _) v2) =
     let diffedMap = diffStatusTaggedMap unionFunctionDepth0 v1 v2
-     in if hasTagOtherThanSame diffedMap
-        then Tagged (Changed ()) diffedMap
-        else Tagged Same diffedMap
+     in if hasTagOtherThanSame diffedMap || not (diffIsEqDoc l r)
+        then Tagged (Attach (mergeDiff l r) (Changed ())) diffedMap
+        else Tagged (Attach (mergeDiff l r) Same) diffedMap
 
-hasTagOtherThanSame :: Map k (Tagged (StatusTag n) v) -> Bool
+hasTagOtherThanSame :: Map k (Tagged (Attach a (StatusTag n)) v) -> Bool
 hasTagOtherThanSame = SMap.foldl step initial
 
     where
 
     initial = False
 
-    step _ (Tagged (Changed _) _) = True
-    step _ (Tagged Added _) = True
-    step _ (Tagged Removed _) = True
+    step _ (Tagged (Attach _ (Changed _)) _) = True
+    step _ (Tagged (Attach _ Added) _) = True
+    step _ (Tagged (Attach _ Removed) _) = True
     step b _ = b
 
-unionFunctionDepth2 ::
-       Tagged (StatusTag ()) (ModuleContextDefault (StatusTag ()) (StatusTag EntityContextType))
-    -> Tagged (StatusTag ()) (ModuleContextDefault (StatusTag ()) (StatusTag EntityContextType))
-    -> Tagged (StatusTag ()) (ModuleContextDefault (StatusTag ()) (StatusTag EntityContextType))
-unionFunctionDepth2 (Tagged _ m1) (Tagged _ m2) =
+diffModuleContext ::
+       ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType
+    -> ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType
+    -> ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType
+diffModuleContext m1 m2 =
     let diffClasses =
             diffStatusTaggedMap unionFunctionDepth0 (mClasses m1) (mClasses m2)
         diffDataTypes =
@@ -110,32 +131,42 @@ unionFunctionDepth2 (Tagged _ m1) (Tagged _ m2) =
                 unionFunctionDepth0
                 (mFunctions m1)
                 (mFunctions m2)
+     in ModuleContext
+            { mClasses = diffClasses
+            , mDataTypes = diffDataTypes
+            , mFixities = diffFixities
+            , mInstances = diffInstances
+            , mNewTypes = diffNewTypes
+            , mPatterns = diffPatterns
+            , mTypeAliases = diffTypeAliases
+            , mFunctions = diffFunctions
+            }
+
+unionFunctionDepth2 ::
+       Tagged (Attach (Diff [Annotation]) (StatusTag ())) (ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType)
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType)
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (ModuleContext (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)) String EntityContextType)
+unionFunctionDepth2 (Tagged (Attach l _) m1) (Tagged (Attach r _) m2) =
+    let diffedMC = diffModuleContext m1 m2
         newTag =
-            if hasTagOtherThanSame diffFunctions
-                   || hasTagOtherThanSame diffTypeAliases
-                   || hasTagOtherThanSame diffPatterns
-                   || hasTagOtherThanSame diffNewTypes
-                   || hasTagOtherThanSame diffInstances
-                   || hasTagOtherThanSame diffFixities
-                   || hasTagOtherThanSame diffDataTypes
-                   || hasTagOtherThanSame diffClasses
+            if hasTagOtherThanSame (mFunctions diffedMC)
+                   || hasTagOtherThanSame (mTypeAliases diffedMC)
+                   || hasTagOtherThanSame (mPatterns diffedMC)
+                   || hasTagOtherThanSame (mNewTypes diffedMC)
+                   || hasTagOtherThanSame (mInstances diffedMC)
+                   || hasTagOtherThanSame (mFixities diffedMC)
+                   || hasTagOtherThanSame (mDataTypes diffedMC)
+                   || hasTagOtherThanSame (mClasses diffedMC)
+                   || not (diffIsEqDoc l r)
             then Changed ()
             else Same
-     in Tagged newTag
-            $ ModuleContext
-                  { mClasses = diffClasses
-                  , mDataTypes = diffDataTypes
-                  , mFixities = diffFixities
-                  , mInstances = diffInstances
-                  , mNewTypes = diffNewTypes
-                  , mPatterns = diffPatterns
-                  , mTypeAliases = diffTypeAliases
-                  , mFunctions = diffFunctions
-                  }
+     in Tagged (Attach (mergeDiff l r) newTag)  -- XXX Diff between the strings
+                                                -- for doc here.
+            $ diffedMC
 
 -- unionFunctionDepth3 if Tagged
 diffAPI ::
-       API (StatusTag ()) (StatusTag ()) (StatusTag EntityContextType)
-    -> API (StatusTag ()) (StatusTag ()) (StatusTag EntityContextType)
-    -> API (StatusTag ()) (StatusTag ()) (StatusTag EntityContextType)
+       API (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType))
+    -> API (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType))
+    -> API (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType))
 diffAPI api1 api2 = diffStatusTaggedMap unionFunctionDepth2 api1 api2
