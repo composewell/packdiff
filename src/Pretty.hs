@@ -1,12 +1,18 @@
+
 module Pretty
     ( prettyAPI
+    , prettyMC
+    , prettyD0
+    , prettyD1
+    , Element(..)
+    , printer
     ) where
 
 --------------------------------------------------------------------------------
 -- Imports
 --------------------------------------------------------------------------------
 
-import Data.List (intersperse, isInfixOf)
+import Data.List (intersperse, nub)
 import Data.Map (Map)
 
 import qualified Data.Map.Strict as SMap
@@ -30,8 +36,20 @@ indenter i = map (replicate i ' ' ++)
 printer :: [String] -> String
 printer = concat . intersperse "\n" . filter (not . null . stripBegin)
 
+data Element
+    = ELClasses
+    | ELDataTypes Bool
+    | ELFixities
+    | ELInstances Bool
+    | ELNewTypes Bool
+    | ELPatterns
+    | ELTypeAliases
+    | ELFunctions
+    deriving (Eq)
+
 prettyD0 ::
-       Map String (Tagged (StatusTag EntityContextType) EntityContextType)
+       Show d
+    => Map String (Tagged (Attach d (StatusTag EntityContextType)) EntityContextType)
     -> [String]
 prettyD0 = SMap.foldlWithKey step initial
 
@@ -39,72 +57,77 @@ prettyD0 = SMap.foldlWithKey step initial
 
     initial = []
 
-    step a k (Tagged Added b) = unwords ["[A]", k, ":", showECT b] : a
-    step a k (Tagged Removed b) =
-        unwords ["[R]", k, ":", showECT b] : a
+    step a k (Tagged (Attach d Added) b) =
+        unwords ["[A]", show d, k, ":", showECT b] : a
+    step a k (Tagged (Attach d Removed) b) =
+        unwords ["[R]", show d, k, ":", showECT b] : a
     -- step a k (Tagged Same b) = unwords ["[S]", k, ":", showECT b] : a
-    step a _ (Tagged Same _) = a
-    step a k (Tagged (Changed b1) b) =
+    step a _ (Tagged (Attach _ Same) _) = a
+    step a k (Tagged (Attach d (Changed b1)) b) =
         concat
-            [ [unwords ["[C]", k, ":"]]
+            [ [unwords ["[C]", show d, k, ":"]]
             , indenter
                   4
-                  [ unwords ["[OLD]", showECT b]
-                  , unwords ["[NEW]", showECT b1]
-                  ]
+                  [unwords ["[OLD]", showECT b], unwords ["[NEW]", showECT b1]]
             , a
             ]
 
 prettyD1 ::
-       Map String (Tagged (StatusTag ()) (Map String (Tagged (StatusTag EntityContextType) EntityContextType)))
+       Show d
+    => Bool
+    -> Map String (Tagged (Attach d (StatusTag ())) (Map String (Tagged (Attach d (StatusTag EntityContextType)) EntityContextType)))
     -> [String]
-prettyD1 = SMap.foldlWithKey step initial
+prettyD1 l = SMap.foldlWithKey step initial
 
     where
 
     initial = []
 
-    step a _ (Tagged Same _) = a
-    step a k (Tagged t b) =
-        concat [[unwords [prettyTag t, k]], indenter 4 (prettyD0 b), a]
+    step a _ (Tagged (Attach _d Same) _) = a
+    step a k (Tagged (Attach d t) b) =
+        if l
+        then concat
+                 [ [unwords [prettyTag t, show d, k]]
+                 , indenter 4 (prettyD0 b)
+                 , a
+                 ]
+        else concat [[unwords [prettyTag t, show d, k]], a]
 
 prettyMC ::
-       ModuleContextDefault (StatusTag ()) (StatusTag EntityContextType)
+       Show d
+    => [Element]
+    -> ModuleContextDefault (Attach d (StatusTag ())) (Attach d (StatusTag EntityContextType))
     -> [String]
-prettyMC ctx =
-    concat
-        [ prettyD0 (mClasses ctx) -- "Classes"
-        , prettyD1 (mDataTypes ctx) -- "DataTypes"
-        , prettyD0 (mFixities ctx) -- "Fixities"
-        , prettyD1 (mInstances ctx) -- "Instances"
-        , prettyD1 (mNewTypes ctx) -- "NewTypes"
-        , prettyD0 (mPatterns ctx) -- "Patterns"
-        , prettyD0 (mTypeAliases ctx) -- "TypeAliases"
-        , prettyD0 (mFunctions ctx) -- "Functions"
-        ]
-
-prettyAPI ::
-       Bool
-    -> Maybe Int
-    -> API (StatusTag ()) (StatusTag ()) (StatusTag EntityContextType)
-    -> String
-prettyAPI ignoreInternal trunction =
-    printer . truncator . SMap.foldlWithKey step initial
+prettyMC elems ctx = concat $ map displayer $ nub elems
 
     where
 
-    truncator =
-        case trunction of
-            Just t -> map (take t)
-            Nothing -> id
+    displayer ELClasses = prettyD0 $ mClasses ctx
+    displayer (ELDataTypes l) = prettyD1 l $ mDataTypes ctx
+    displayer ELFixities = prettyD0 $ mFixities ctx
+    displayer (ELInstances l) = prettyD1 l $ mInstances ctx
+    displayer (ELNewTypes l) = prettyD1 l $ mNewTypes ctx
+    displayer ELPatterns = prettyD0 $ mPatterns ctx
+    displayer ELTypeAliases = prettyD0 $ mTypeAliases ctx
+    displayer ELFunctions = prettyD0 $ mFunctions ctx
+
+
+prettyAPI ::
+       Show d
+    => [Element]
+    -> API (Attach d (StatusTag ())) (Attach d (StatusTag ())) (Attach d (StatusTag EntityContextType))
+    -> String
+prettyAPI elems = printer . SMap.foldlWithKey step initial
+
+    where
 
     initial = []
 
-    step a _ (Tagged Same _) = a
-    step a k (Tagged t b) =
-        let ptfy = concat [[unwords [prettyTag t, k]], indenter 4 (prettyMC b)]
-         in if ignoreInternal
-            then if "Internal" `isInfixOf` k
-                 then a
-                 else concat [ptfy, a]
-            else concat [ptfy, a]
+    step a _ (Tagged (Attach _ Same) _) = a
+    step a k (Tagged (Attach d t) b) =
+        let ptfy =
+                concat
+                    [ [unwords [prettyTag t, show d, k]]
+                    , indenter 4 (prettyMC elems b)
+                    ]
+         in concat [ptfy, a]
