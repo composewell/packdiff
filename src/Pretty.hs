@@ -30,6 +30,100 @@ prettyTag Removed = "[R]"
 prettyTag Same = "[S]"
 prettyTag (Changed _) = "[C]"
 
+isDeprecated :: [Annotation] -> Bool
+isDeprecated anns =
+    let f x =
+            case x of
+                Deprecated _ -> True
+                _ -> False
+     in not $ null $ filter f anns
+
+-- Don't print if deprecated in Left
+-- Error out if deprecated in Left and not deprecated in Right
+-- Error out if deprecated in Right and Added
+prettyD0_ ::
+       String
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType
+    -> [String]
+prettyD0_ _ (Tagged (Attach (DLeft anns) Removed) b) =
+    if isDeprecated anns
+    then [""]
+    else ["[R] " ++ showECT b]
+prettyD0_ _ (Tagged (Attach (DRight anns) Added) b) =
+    if isDeprecated anns
+    then [""]
+    else ["[A] " ++ showECT b]
+prettyD0_ k (Tagged (Attach (DBoth annsL annsR) (Changed b1)) b) =
+    if isDeprecated annsR && isDeprecated annsL
+    then [""]
+    else if isDeprecated annsR && not (isDeprecated annsL)
+         then ["[D] " ++ showECT b1]
+         else if not (isDeprecated annsR) && isDeprecated annsL
+              then [""]
+              else if b1 == b
+                   then [""]
+                   else concat
+                            [ ["[C] " ++ k]
+                            , indenter
+                                  4
+                                  ["[O] " ++ showECT b, "[N] " ++ showECT b1]
+                            ]
+prettyD0_ _ (Tagged (Attach (DBoth annsL annsR) Same) b) =
+    if isDeprecated annsR && not (isDeprecated annsL)
+    then ["[D] " ++ showECT b]
+    else [""]
+
+prettyD1_ ::
+       String
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType))
+    -> [String]
+prettyD1_ k (Tagged (Attach (DLeft anns) Removed) b) =
+    if isDeprecated anns
+    then [""]
+    else ["[R] " ++ k]
+prettyD1_ k (Tagged (Attach (DRight anns) Added) b) =
+    if isDeprecated anns
+    then [""]
+    else concat [["[A] " ++ k], indenter 4 (prettyD0 b)]
+prettyD1_ k (Tagged (Attach (DBoth annsL annsR) (Changed ())) b) =
+    if isDeprecated annsR && isDeprecated annsL
+    then [""]
+    else if isDeprecated annsR && not (isDeprecated annsL)
+         then concat [["[D] " ++ k], indenter 4 (prettyD0 b)]
+         else if not (isDeprecated annsR) && isDeprecated annsL
+              then [""]
+              else concat [["[C] " ++ k], indenter 4 (prettyD0 b)]
+prettyD1_ k (Tagged (Attach (DBoth annsL annsR) Same) b) =
+    if isDeprecated annsR && not (isDeprecated annsL)
+    then ["[D] " ++ k]
+    else [""]
+
+prettyAPI_ ::
+       [Element]
+    -> ModuleName
+    -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (ModuleContextDefault (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)))
+    -> [String]
+prettyAPI_ _ k (Tagged (Attach (DLeft anns) Removed) b) =
+    if isDeprecated anns
+    then [""]
+    else ["[R] " ++ k]
+prettyAPI_ elems k (Tagged (Attach (DRight anns) Added) b) =
+    if isDeprecated anns
+    then [""]
+    else concat [["[A] " ++ k], indenter 4 (prettyMC elems b)]
+prettyAPI_ elems k (Tagged (Attach (DBoth annsL annsR) (Changed ())) b) =
+    if isDeprecated annsR && isDeprecated annsL
+    then [""]
+    else if isDeprecated annsR && not (isDeprecated annsL)
+         then concat [["[D] " ++ k], indenter 4 (prettyMC elems b)]
+         else if not (isDeprecated annsR) && isDeprecated annsL
+              then [""]
+              else concat [["[C] " ++ k], indenter 4 (prettyMC elems b)]
+prettyAPI_ _ k (Tagged (Attach (DBoth annsL annsR) Same) b) =
+    if isDeprecated annsR && not (isDeprecated annsL)
+    then ["[D] " ++ k]
+    else [""]
+
 indenter :: Int -> [String] -> [String]
 indenter i = map (replicate i ' ' ++)
 
@@ -48,8 +142,7 @@ data Element
     deriving (Eq)
 
 prettyD0 ::
-       Show d
-    => Map String (Tagged (Attach d (StatusTag EntityContextType)) EntityContextType)
+       Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType)
     -> [String]
 prettyD0 = SMap.foldlWithKey step initial
 
@@ -57,25 +150,11 @@ prettyD0 = SMap.foldlWithKey step initial
 
     initial = []
 
-    step a k (Tagged (Attach d Added) b) =
-        unwords ["[A]", show d, k, ":", showECT b] : a
-    step a k (Tagged (Attach d Removed) b) =
-        unwords ["[R]", show d, k, ":", showECT b] : a
-    -- step a k (Tagged Same b) = unwords ["[S]", k, ":", showECT b] : a
-    step a _ (Tagged (Attach _ Same) _) = a
-    step a k (Tagged (Attach d (Changed b1)) b) =
-        concat
-            [ [unwords ["[C]", show d, k, ":"]]
-            , indenter
-                  4
-                  [unwords ["[OLD]", showECT b], unwords ["[NEW]", showECT b1]]
-            , a
-            ]
+    step a k t = prettyD0_ k t ++ a
 
 prettyD1 ::
-       Show d
-    => Bool
-    -> Map String (Tagged (Attach d (StatusTag ())) (Map String (Tagged (Attach d (StatusTag EntityContextType)) EntityContextType)))
+       Bool
+    -> Map String (Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType)))
     -> [String]
 prettyD1 l = SMap.foldlWithKey step initial
 
@@ -83,20 +162,11 @@ prettyD1 l = SMap.foldlWithKey step initial
 
     initial = []
 
-    step a _ (Tagged (Attach _d Same) _) = a
-    step a k (Tagged (Attach d t) b) =
-        if l
-        then concat
-                 [ [unwords [prettyTag t, show d, k]]
-                 , indenter 4 (prettyD0 b)
-                 , a
-                 ]
-        else concat [[unwords [prettyTag t, show d, k]], a]
+    step a k t = prettyD1_ k t ++ a
 
 prettyMC ::
-       Show d
-    => [Element]
-    -> ModuleContextDefault (Attach d (StatusTag ())) (Attach d (StatusTag EntityContextType))
+       [Element]
+    -> ModuleContextDefault (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType))
     -> [String]
 prettyMC elems ctx = concat $ map displayer $ nub elems
 
@@ -113,9 +183,8 @@ prettyMC elems ctx = concat $ map displayer $ nub elems
 
 
 prettyAPI ::
-       Show d
-    => [Element]
-    -> API (Attach d (StatusTag ())) (Attach d (StatusTag ())) (Attach d (StatusTag EntityContextType))
+       [Element]
+    -> API (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType))
     -> String
 prettyAPI elems = printer . SMap.foldlWithKey step initial
 
@@ -123,11 +192,4 @@ prettyAPI elems = printer . SMap.foldlWithKey step initial
 
     initial = []
 
-    step a _ (Tagged (Attach _ Same) _) = a
-    step a k (Tagged (Attach d t) b) =
-        let ptfy =
-                concat
-                    [ [unwords [prettyTag t, show d, k]]
-                    , indenter 4 (prettyMC elems b)
-                    ]
-         in concat [ptfy, a]
+    step a k t = prettyAPI_ elems k t ++ a

@@ -345,7 +345,7 @@ haddockParseFold tag3 tag2 tag1 = extract <$> Fold.foldl' step initial
         mCtxAp doc2 api mname (tCtxAp doc1 mctx dname dctx)
 
     initial = ("", PNone Map.empty)
-    getAfterTypeCtx = reverse . takeWhile (/= '>') . reverse
+    getAfterTypeCtx = reverse . takeWhile (/= '>') . reverse . dropWord
     getW1AfterTypeCtx = takeWord . getAfterTypeCtx
     getRestAfterTypeCtx = stripBegin . dropWord . getAfterTypeCtx
     getClassName = getW1AfterTypeCtx
@@ -384,7 +384,7 @@ haddockParseFold tag3 tag2 tag1 = extract <$> Fold.foldl' step initial
             let singMap =
                     Tagged (Attach "" tag2)
                         $ Map.singleton
-                              (getInstanceOf line)
+                              (getInstanceFor line)
                               (mapperStr doc line)
 
                 insertF (Tagged (Attach "" _) a) (Tagged (Attach "" _) b) =
@@ -396,7 +396,7 @@ haddockParseFold tag3 tag2 tag1 = extract <$> Fold.foldl' step initial
                           { mInstances =
                                 SMap.insertWith
                                     insertF
-                                    (getInstanceFor line)
+                                    (getInstanceOf line)
                                     singMap
                                     (mInstances ctx)
                           }
