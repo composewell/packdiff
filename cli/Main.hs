@@ -8,13 +8,13 @@ module Main
 
 import Control.Monad (when)
 import Data.Function ((&))
--- import Data.List (isInfixOf, foldl1)
+import Data.List (isInfixOf)
 import Streamly.Data.Stream (Stream)
 import System.Environment (getArgs)
 
 -- import Debug.Trace (trace)
 
--- import qualified Data.Map as Map
+import qualified Data.Map as Map
 import qualified Streamly.Data.Fold as Fold
 import qualified Streamly.Data.Stream as Stream
 import qualified Streamly.Internal.FileSystem.File as File
@@ -70,6 +70,17 @@ fileToLines path =
     File.readChunks path & Unicode.decodeUtf8Chunks
         & Stream.foldMany (Fold.takeEndBy_ (== '\n') Fold.toList)
 
+isDeprecated :: [Annotation] -> Bool
+isDeprecated anns =
+    let f x =
+            case x of
+                Deprecated _ -> True
+                _ -> False
+     in not $ null $ filter f anns
+
+isInternal :: ModuleName -> Bool
+isInternal x = "Internal" `isInfixOf` x
+
 main :: IO ()
 main = do
     args <- getArgs
@@ -107,7 +118,23 @@ main = do
             , ELTypeAliases
             , ELFunctions
             ]
-    putStrLn $ prettyAPI elems (diffAPI api1 api2)
+    let isDeprecatedInBoth (Tagged (Attach (DBoth annl annr) _) _) =
+            isDeprecated annl && isDeprecated annr
+        isDeprecatedInBoth _ = False
+
+        isDeprecatedInLeft (Tagged (Attach (DLeft anns) _) _) =
+            isDeprecated anns
+        isDeprecatedInLeft (Tagged (Attach (DBoth anns _) _) _) =
+            isDeprecated anns
+        isDeprecatedInLeft _ = False
+
+    let diff =
+            let filt k v =
+                    not (isInternal k)
+                        && not (isDeprecatedInBoth v || isDeprecatedInLeft v)
+            in Map.filterWithKey filt (diffAPI api1 api2)
+
+    putStrLn $ prettyAPI elems diff
 
 -- TODO:
 

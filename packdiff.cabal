@@ -51,5 +51,6 @@ executable packdiff
                      , streamly-core      == 0.1.0.*
                      , streamly-process   == 0.2.0.*
                      , packdiff
+                     , containers
   hs-source-dirs:      cli
   default-language:    Haskell2010
