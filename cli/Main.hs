@@ -122,15 +122,16 @@ mainSingle args = do
 
 mainDiff :: [String] -> IO ()
 mainDiff args = do
-    args <- getArgs
-    when (length args < 3) $ fail "Need a target and 2 revisions to compare."
-    let target = args !! 0
-        rev1 = args !! 1
-        rev2 = args !! 2
-    (Just file1) <- checkoutAndGenerateHoogleFile target rev1
-    (Just file2) <- checkoutAndGenerateHoogleFile target rev2
-    putStrLn $ unwords ["File for", rev1, ":", file1]
-    putStrLn $ unwords ["File for", rev2, ":", file2]
+    when (length args < 4)
+        $ fail "target1 revision-for-target1 target2 revision-for-target-2"
+    let target1 = args !! 0
+        revTarget1 = args !! 1
+        target2 = args !! 2
+        revTarget2 = args !! 3
+    (Just file1) <- checkoutAndGenerateHoogleFile target1 revTarget1
+    (Just file2) <- checkoutAndGenerateHoogleFile target2 revTarget2
+    putStrLn $ unwords ["File for", target1, revTarget1, ":", file1]
+    putStrLn $ unwords ["File for", target2, revTarget2, ":", file2]
     api1 <-
         fileToLines file1
             & Stream.fold (haddockParseFold Removed Removed Removed)
@@ -166,13 +167,11 @@ mainDiff args = do
         isDeprecatedInLeft (Tagged (Attach (DBoth anns _) _) _) =
             isDeprecated anns
         isDeprecatedInLeft _ = False
-
     let diff =
             let filt k v =
                     not (isInternal k)
                         && not (isDeprecatedInBoth v || isDeprecatedInLeft v)
-            in Map.filterWithKey filt (diffAPI api1 api2)
-
+             in Map.filterWithKey filt (diffAPI api1 api2)
     putStrLn $ prettyAPI elems diff
 
 main :: IO ()
