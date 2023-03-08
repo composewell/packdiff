@@ -81,8 +81,47 @@ isDeprecated anns =
 isInternal :: ModuleName -> Bool
 isInternal x = "Internal" `isInfixOf` x
 
-main :: IO ()
-main = do
+mainSingle :: [String] -> IO ()
+mainSingle args = do
+    when (length args < 2) $ fail "Need a target and a revision."
+    let target = args !! 0
+        rev1 = args !! 1
+    (Just file1) <- checkoutAndGenerateHoogleFile target rev1
+    putStrLn $ unwords ["File for", rev1, ":", file1]
+    api1 <-
+        fileToLines file1
+            & Stream.fold (haddockParseFold Added Added Added)
+            & fmap
+                  (mapAPITags
+                       (mapAttachment (DRight . parseDoc))
+                       (mapAttachment (DRight . parseDoc))
+                       (mapAttachment (DRight . parseDoc)))
+    step "Printing API"
+    let elems =
+            [ ELClasses
+            , ELDataTypes True
+            , ELFixities
+            , ELInstances True
+            , ELNewTypes True
+            , ELPatterns
+            , ELTypeAliases
+            , ELFunctions
+            ]
+    let isDeprecatedInRight (Tagged (Attach (DRight anns) _) _) =
+            isDeprecated anns
+        isDeprecatedInRight (Tagged (Attach (DBoth _ anns) _) _) =
+            isDeprecated anns
+        isDeprecatedInRight _ = False
+
+    let apiFiltered =
+            Map.filterWithKey
+                   (\k v -> not (isInternal k) && not (isDeprecatedInRight v))
+                   api1
+
+    putStrLn $ prettyAPI elems apiFiltered
+
+mainDiff :: [String] -> IO ()
+mainDiff args = do
     args <- getArgs
     when (length args < 3) $ fail "Need a target and 2 revisions to compare."
     let target = args !! 0
@@ -135,6 +174,17 @@ main = do
             in Map.filterWithKey filt (diffAPI api1 api2)
 
     putStrLn $ prettyAPI elems diff
+
+main :: IO ()
+main = do
+    args <- getArgs
+    when (length args < 1) $ fail "Need a mode. [single] or [diff]."
+    let mode = args !! 0
+    case mode of
+        "single" -> mainSingle (tail args)
+        "diff" -> mainDiff (tail args)
+        _ -> error "Improper mode."
+
 
 -- TODO:
 
