@@ -4,8 +4,8 @@
 # nix-shell --argstr compiler "ghc8107"
 
 { nixpkgs ? import (builtins.fetchTarball
-  "https://github.com/NixOS/nixpkgs/archive/refs/tags/22.05.tar.gz") { }
-, compiler ? "ghc922" }:
+  "https://github.com/NixOS/nixpkgs/archive/refs/tags/22.11.tar.gz") { }
+, compiler ? "default" }:
 let
   utils = let
     src = fetchGit {
@@ -30,12 +30,20 @@ let
         (with nixpkgs.haskell.lib;
           self: super: {
             packdiff = utils.local super "packdiff" ./. "" inShell;
-            streamly = utils.composewell super "streamly"
-              "8240f5f870fe47623df99514aed6a542f80c9641";
-            streamly-core = utils.composewellDir super "streamly"
-              "8240f5f870fe47623df99514aed6a542f80c9641" "/core";
+            streamly =
+                super.callHackageDirect
+                  { pkg = "streamly";
+                    ver = "0.9.0";
+                    sha256 = "1ab5n253krgccc66j7ch1lx328b1d8mhkfz4szl913chr9pmbv3q";
+                  } {};
+            streamly-core =
+                super.callHackageDirect
+                  { pkg = "streamly-core";
+                    ver = "0.1.0";
+                    sha256 = "00lfgvicap41rxapzjcml0qxry1lx8501jarhjxrcpxy1plrb146";
+                  } {};
             streamly-process = utils.composewell super "streamly-process"
-              "65e3ae489637099d0189a1ba184bb08a5c16de48";
+              "d80b860d9d8ea98e4f7f63390442b3155c34dd08";
           });
     });
 
