@@ -96,7 +96,6 @@ mainSingle args = do
                        (mapAttachment (DRight . parseDoc))
                        (mapAttachment (DRight . parseDoc))
                        (mapAttachment (DRight . parseDoc)))
-    step "Printing API"
     let elems =
             [ ELClasses
             , ELDataTypes True
@@ -113,12 +112,17 @@ mainSingle args = do
             isDeprecated anns
         isDeprecatedInRight _ = False
 
-    let apiFiltered =
+    let apiReleased =
             Map.filterWithKey
                    (\k v -> not (isInternal k) && not (isDeprecatedInRight v))
                    api1
+    let apiInternal =
+            Map.filterWithKey (\k _ -> isInternal k) api1
 
-    putStrLn $ prettyAPI elems apiFiltered
+    step "Released API"
+    putStrLn $ prettyAPI elems apiReleased
+    step "Internal API"
+    putStrLn $ prettyAPI elems apiInternal
 
 mainDiff :: [String] -> IO ()
 mainDiff args = do
@@ -147,7 +151,15 @@ mainDiff args = do
                        (mapAttachment (DRight . parseDoc))
                        (mapAttachment (DRight . parseDoc))
                        (mapAttachment (DRight . parseDoc)))
-    step "Printing diff"
+
+    step "API Annotations"
+    putStrLn "[A] : Added"
+    putStrLn "[R] : Removed"
+    putStrLn "[C] : Changed"
+    putStrLn "[O] : Old definition"
+    putStrLn "[N] : New definition"
+    putStrLn "[D] : Deprecated"
+
     let elems =
             [ ELClasses
             , ELDataTypes True
@@ -167,12 +179,18 @@ mainDiff args = do
         isDeprecatedInLeft (Tagged (Attach (DBoth anns _) _) _) =
             isDeprecated anns
         isDeprecatedInLeft _ = False
-    let diff =
+    let diffRel =
             let filt k v =
                     not (isInternal k)
                         && not (isDeprecatedInBoth v || isDeprecatedInLeft v)
              in Map.filterWithKey filt (diffAPI api1 api2)
-    putStrLn $ prettyAPI elems diff
+    let diffInt =
+            let filt k _ = isInternal k
+             in Map.filterWithKey filt (diffAPI api1 api2)
+    step "API diff"
+    putStrLn $ prettyAPI elems diffRel
+    step "Internal API diff"
+    putStrLn $ prettyAPI elems diffInt
 
 main :: IO ()
 main = do
