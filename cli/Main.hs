@@ -8,14 +8,17 @@ module Main
 
 import Control.Monad (when)
 import Data.Function ((&))
-import Data.List (isInfixOf)
+import Data.List (isInfixOf, isPrefixOf)
 import Streamly.Data.Stream (Stream)
 import System.Environment (getArgs)
+import Data.Char (ord)
+import Streamly.Data.Fold (Fold)
 
 -- import Debug.Trace (trace)
 
 import qualified Data.Map as Map
 import qualified Streamly.Data.Fold as Fold
+import qualified Streamly.Data.Parser as Parser
 import qualified Streamly.Data.Stream as Stream
 import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.System.Command as Command
@@ -127,15 +130,15 @@ mainSingle args = do
 mainDiff :: [String] -> IO ()
 mainDiff args = do
     when (length args < 4)
-        $ fail "target1 revision-for-target1 target2 revision-for-target-2"
-    let target1 = args !! 0
-        revTarget1 = args !! 1
-        target2 = args !! 2
+        $ fail "target1 cabal-file revision-for-target1 revision-for-target-2"
+    let target = args !! 0
+        cabalFilePath = args !! 1
+        revTarget1 = args !! 2
         revTarget2 = args !! 3
-    (Just file1) <- checkoutAndGenerateHoogleFile target1 revTarget1
-    (Just file2) <- checkoutAndGenerateHoogleFile target2 revTarget2
-    putStrLn $ unwords ["File for", target1, revTarget1, ":", file1]
-    putStrLn $ unwords ["File for", target2, revTarget2, ":", file2]
+    (Just file1) <- checkoutAndGenerateHoogleFile target revTarget1
+    (Just file2) <- checkoutAndGenerateHoogleFile target revTarget2
+    putStrLn $ unwords ["File for", target, revTarget1, ":", file1]
+    putStrLn $ unwords ["File for", target, revTarget2, ":", file2]
     api1 <-
         fileToLines file1
             & Stream.fold (haddockParseFold Removed Removed Removed)
@@ -179,6 +182,10 @@ mainDiff args = do
         isDeprecatedInLeft (Tagged (Attach (DBoth anns _) _) _) =
             isDeprecated anns
         isDeprecatedInLeft _ = False
+
+        hasChanged (Tagged (Attach (DBoth _ _) _) _) = True
+        hasChanged _ = False
+
     let diffRel =
             let filt k v =
                     not (isInternal k)
@@ -191,6 +198,98 @@ mainDiff args = do
     putStrLn $ prettyAPI elems diffRel
     step "Internal API diff"
     putStrLn $ prettyAPI elems diffInt
+
+    let diffRelChanged = Map.filter hasChanged diffRel
+    step "Changed Released API diff"
+    putStrLn $ prettyAPI elems diffRelChanged
+
+    step "Validating PVP"
+    if Map.size diffRelChanged > 0
+    then do
+        ecmv <- getMajorVersionFrom cabalFilePath
+        case ecmv of
+            Left err -> error err
+            Right (a2, b2) -> do
+                (a1, b1) <- getLatestMajorVersionFromGitTag $ target ++ "-"
+                let cmpRes =
+                        case compare a2 a1 of
+                            EQ -> compare b2 b1
+                            x -> x
+                case cmpRes of
+                    GT -> do
+                        putStrLn "Major version is bumped."
+                        putStrLn $ "Prev: " ++ show (a1, b1)
+                        putStrLn $ "Curr: " ++ show (a2, b2)
+                    _ -> do
+                        putStrLn "Need to bump major version"
+                        putStrLn $ "Prev: " ++ show (a1, b1)
+                        putStrLn $ "Curr: " ++ show (a2, b2)
+                        error "PVP"
+    else pure ()
+
+{-# INLINE intEndBy_ #-}
+intEndBy_ :: Monad m => Fold m Char Int
+intEndBy_ = Fold.takeEndBy_ (== '.') (Fold.foldl' stp 0)
+
+    where
+
+    stp a c = a * 10 + fromIntegral (ord c - 48)
+
+fMajorVersionFromString :: Monad m => Fold m Char (Int, Int)
+fMajorVersionFromString = (,) <$> intEndBy_ <*> intEndBy_
+
+getMajorVersionFrom :: FilePath -> IO (Either String (Int, Int))
+getMajorVersionFrom cabalFile = do
+    mval <- getVersionLine
+    case mval of
+        Nothing -> pure $ Left "getCurrentMajorVersion: empty"
+        Just val -> do
+            putStrLn $ "getCurrentMajorVersion[Version line]: " ++ show val
+            eres <- Stream.parse pMajorVersionLine $ Stream.fromList val
+            case eres of
+                Left _ -> pure $ Left "getCurrentMajorVersion: parsing failed"
+                Right res -> do
+                    putStrLn
+                        $ "getCurrentMajorVersion[Parsed major]: " ++ show res
+                    pure $ Right res
+
+    where
+
+    getVersionLine =
+        fileToLines cabalFile
+            & Stream.filter ("version:" `isPrefixOf`)
+            & Stream.fold Fold.one
+
+    pMajorVersionLine =
+        Parser.fromFold (Fold.takeEndBy_ (== ':') Fold.drain)
+            *> Parser.dropWhile  (== ' ')
+            *> Parser.fromFold fMajorVersionFromString
+
+getLatestMajorVersionFromGitTag :: String -> IO (Int, Int)
+getLatestMajorVersionFromGitTag prefix = do
+    versions <-
+        Command.toLines Fold.toList "git tag"
+            & Stream.filter (prefix `isPrefixOf`)
+            & fmap (drop (length prefix))
+            & Stream.fold Fold.toList
+    putStrLn $ "getLatestMajorVersionFromGitTag[Versions]: \n" ++ show versions
+    parsedMajors <-
+        Stream.fromList versions
+            & Stream.mapM
+                  (Stream.fold fMajorVersionFromString . Stream.fromList)
+            & Stream.toList
+    putStrLn
+        $ "getLatestMajorVersionFromGitTag[Parsed]: \n" ++ show parsedMajors
+    Stream.fromList parsedMajors
+        & Stream.fold
+              (Fold.foldl'
+                  (\(a1, b1) (a2, b2) ->
+                       case compare a2 a1 of
+                           EQ -> (a2, max b1 b2)
+                           GT -> (a2, b2)
+                           LT -> (a1, b1)
+                  )
+                  (0, 0))
 
 main :: IO ()
 main = do
