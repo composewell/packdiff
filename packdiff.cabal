@@ -37,7 +37,7 @@ library
                      , Diff
                      , Pretty
   -- other-extensions:
-  build-depends:       base           >= 4.10  && < 4.17
+  build-depends:       base           >= 4.10  && < 4.20
                      , streamly-core  >= 0.1.0
                      , containers     >= 0.6   && < 0.7
   hs-source-dirs:      src
@@ -47,7 +47,7 @@ executable packdiff
   import: compile-options
   main-is:             Main.hs
   -- other-extensions:
-  build-depends:       base               >= 4.10  && < 4.17
+  build-depends:       base               >= 4.10  && < 4.20
                      , streamly-core      >= 0.1.0
                      , streamly-process   == 0.3.0.*
                      , packdiff
