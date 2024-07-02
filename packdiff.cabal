@@ -49,7 +49,7 @@ executable packdiff
   -- other-extensions:
   build-depends:       base               >= 4.10  && < 4.20
                      , streamly-core      >= 0.1.0
-                     , streamly-process   == 0.3.0.*
+                     , streamly-process   == 0.3.1.*
                      , packdiff
                      , containers
   hs-source-dirs:      cli
