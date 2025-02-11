@@ -1,3 +1,8 @@
+{-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-missing-kind-signatures #-}
+
 module Main
     ( main
     ) where
@@ -6,11 +11,9 @@ module Main
 -- Imports
 --------------------------------------------------------------------------------
 
-import Control.Monad (when)
 import Data.Function ((&))
 import Data.List (isInfixOf)
 import Streamly.Data.Stream (Stream)
-import System.Environment (getArgs)
 
 -- import Debug.Trace (trace)
 
@@ -19,11 +22,35 @@ import qualified Streamly.Data.Fold as Fold
 import qualified Streamly.Data.Stream as Stream
 import qualified Streamly.Internal.FileSystem.File as File
 import qualified Streamly.Internal.System.Command as Command
+import qualified Streamly.Internal.System.Command as Cmd
 import qualified Streamly.Internal.Unicode.Stream as Unicode
+
+import Streamly.Unicode.String (str)
 
 import Diff
 import HoogleFileParser
 import Pretty
+import Options.Generic
+
+--------------------------------------------------------------------------------
+-- CLI
+--------------------------------------------------------------------------------
+
+data Cli
+  = Single
+        { _target :: String
+        , _revision :: String
+        }
+  | Diff
+        { _target1 :: String
+        , _revision1 :: String
+        , _target2 :: String
+        , _revision2 :: String
+        }
+    deriving (Generic, Show)
+
+instance ParseRecord Cli where
+    parseRecord = parseRecordWithModifiers lispCaseModifiers
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -41,6 +68,16 @@ step msg = do
 --------------------------------------------------------------------------------
 -- Main
 --------------------------------------------------------------------------------
+
+_exposeAllModules :: String -> IO ()
+_exposeAllModules cabalFile = do
+    Cmd.toStdout
+        [str|sed -i 's/other-modules:/exposed-modules:/g' #{cabalFile}|]
+
+_gitRestore :: String -> IO ()
+_gitRestore file =
+    Cmd.toStdout
+        [str|git checkout -- #{file}|]
 
 checkoutRevision :: String -> IO ()
 checkoutRevision rev =
@@ -62,7 +99,9 @@ generateHoogleFile target bd =
 checkoutAndGenerateHoogleFile  :: String -> String -> IO (Maybe String)
 checkoutAndGenerateHoogleFile target rev = do
     step $ unwords ["Generating haddock file for", rev]
+    -- gitRestore [str|#{target}.cabal|]
     checkoutRevision rev
+    -- exposeAllModules [str|#{target}.cabal|]
     generateHoogleFile target ("dist-newstyle-" ++ rev)
 
 fileToLines :: String -> Stream IO String
@@ -81,11 +120,10 @@ isDeprecated anns =
 isInternal :: ModuleName -> Bool
 isInternal x = "Internal" `isInfixOf` x
 
-mainSingle :: [String] -> IO ()
-mainSingle args = do
-    when (length args < 2) $ fail "Need a target and a revision."
-    let target = args !! 0
-        rev1 = args !! 1
+mainSingle :: String -> String -> IO ()
+mainSingle t r = do
+    let target = t
+        rev1 = r
     (Just file1) <- checkoutAndGenerateHoogleFile target rev1
     putStrLn $ unwords ["File for", rev1, ":", file1]
     api1 <-
@@ -124,14 +162,12 @@ mainSingle args = do
     step "Internal API"
     putStrLn $ prettyAPI elems apiInternal
 
-mainDiff :: [String] -> IO ()
-mainDiff args = do
-    when (length args < 4)
-        $ fail "target1 revision-for-target1 target2 revision-for-target-2"
-    let target1 = args !! 0
-        revTarget1 = args !! 1
-        target2 = args !! 2
-        revTarget2 = args !! 3
+mainDiff :: String -> String -> String -> String -> IO ()
+mainDiff t1 r1 t2 r2 = do
+    let target1 = t1
+        revTarget1 = r1
+        target2 = t2
+        revTarget2 = r2
     (Just file1) <- checkoutAndGenerateHoogleFile target1 revTarget1
     (Just file2) <- checkoutAndGenerateHoogleFile target2 revTarget2
     putStrLn $ unwords ["File for", target1, revTarget1, ":", file1]
@@ -194,13 +230,10 @@ mainDiff args = do
 
 main :: IO ()
 main = do
-    args <- getArgs
-    when (length args < 1) $ fail "Need a mode. [single] or [diff]."
-    let mode = args !! 0
-    case mode of
-        "single" -> mainSingle (tail args)
-        "diff" -> mainDiff (tail args)
-        _ -> error "Improper mode."
+    res <- getRecord "packdiff"
+    case res of
+        Single t r -> mainSingle t r
+        Diff t1 r1 t2 r2 -> mainDiff t1 r1 t2 r2
 
 
 -- TODO:
