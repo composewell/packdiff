@@ -90,7 +90,7 @@ jobs:
         ghc-version: ${{ matrix.ghc_version }}
         cabal-version: ${{ matrix.cabal_version }}
 
-    - uses: actions/cache@v1
+    - uses: actions/cache@v4
       name: Cache ~/.cabal
       with:
         path: ~/.cabal
