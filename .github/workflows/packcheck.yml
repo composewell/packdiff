@@ -22,7 +22,7 @@ jobs:
       # ------------------------------------------------------------------------
       CABAL_CHECK_RELAX: y
       CABAL_NO_SANDBOX: y
-      CABAL_PROJECT: cabal.project.user
+      # CABAL_PROJECT: cabal.project.user
 
       # ------------------------------------------------------------------------
       # Location of packcheck.sh
