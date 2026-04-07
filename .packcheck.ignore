@@ -1,3 +1,5 @@
 .packcheck.ignore
 .github/workflows/packcheck.yml
 cabal.project
+flake.lock
+flake.nix
