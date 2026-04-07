@@ -1,5 +1,6 @@
 .packcheck.ignore
 .github/workflows/packcheck.yml
-cabal.project
+.gitignore
+cabal.project.user
 flake.lock
 flake.nix
