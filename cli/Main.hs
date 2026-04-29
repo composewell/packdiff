@@ -17,9 +17,10 @@ import System.Environment (getArgs)
 import qualified Data.Map as Map
 import qualified Streamly.Data.Fold as Fold
 import qualified Streamly.Data.Stream as Stream
-import qualified Streamly.Internal.FileSystem.File as File
+import qualified Streamly.Internal.FileSystem.FileIO as File
 import qualified Streamly.Internal.System.Command as Command
 import qualified Streamly.Internal.Unicode.Stream as Unicode
+import qualified Streamly.FileSystem.Path as Path
 
 import Diff
 import HoogleFileParser
@@ -67,7 +68,7 @@ checkoutAndGenerateHoogleFile target rev = do
 
 fileToLines :: String -> Stream IO String
 fileToLines path =
-    File.readChunks path & Unicode.decodeUtf8Chunks
+    File.readChunks (Path.fromString_ path) & Unicode.decodeUtf8Chunks
         & Stream.foldMany (Fold.takeEndBy_ (== '\n') Fold.toList)
 
 isDeprecated :: [Annotation] -> Bool

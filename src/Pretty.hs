@@ -24,11 +24,13 @@ import Diff
 -- Printing helpers
 --------------------------------------------------------------------------------
 
+{-
 prettyTag :: StatusTag s -> String
 prettyTag Added = "[A]"
 prettyTag Removed = "[R]"
 prettyTag Same = "[S]"
 prettyTag (Changed _) = "[C]"
+-}
 
 isDeprecated :: [Annotation] -> Bool
 isDeprecated anns =
@@ -72,12 +74,13 @@ prettyD0_ _ (Tagged (Attach (DBoth annsL annsR) Same) b) =
     if isDeprecated annsR && not (isDeprecated annsL)
     then ["[D] " ++ showECT b]
     else [""]
+prettyD0_ _ _ = error "prettyD0_: impossible pattern"
 
 prettyD1_ ::
        String
     -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType))
     -> [String]
-prettyD1_ k (Tagged (Attach (DLeft anns) Removed) b) =
+prettyD1_ k (Tagged (Attach (DLeft anns) Removed) _) =
     if isDeprecated anns
     then [""]
     else ["[R] " ++ k]
@@ -93,17 +96,18 @@ prettyD1_ k (Tagged (Attach (DBoth annsL annsR) (Changed ())) b) =
          else if not (isDeprecated annsR) && isDeprecated annsL
               then [""]
               else concat [["[C] " ++ k], indenter 4 (prettyD0 b)]
-prettyD1_ k (Tagged (Attach (DBoth annsL annsR) Same) b) =
+prettyD1_ k (Tagged (Attach (DBoth annsL annsR) Same) _) =
     if isDeprecated annsR && not (isDeprecated annsL)
     then ["[D] " ++ k]
     else [""]
+prettyD1_ _ _ = error "prettyD1_: impossible pattern"
 
 prettyAPI_ ::
        [Element]
     -> ModuleName
     -> Tagged (Attach (Diff [Annotation]) (StatusTag ())) (ModuleContextDefault (Attach (Diff [Annotation]) (StatusTag ())) (Attach (Diff [Annotation]) (StatusTag EntityContextType)))
     -> [String]
-prettyAPI_ _ k (Tagged (Attach (DLeft anns) Removed) b) =
+prettyAPI_ _ k (Tagged (Attach (DLeft anns) Removed) _) =
     if isDeprecated anns
     then [""]
     else ["[R] " ++ k]
@@ -119,10 +123,11 @@ prettyAPI_ elems k (Tagged (Attach (DBoth annsL annsR) (Changed ())) b) =
          else if not (isDeprecated annsR) && isDeprecated annsL
               then [""]
               else concat [["[C] " ++ k], indenter 4 (prettyMC elems b)]
-prettyAPI_ _ k (Tagged (Attach (DBoth annsL annsR) Same) b) =
+prettyAPI_ _ k (Tagged (Attach (DBoth annsL annsR) Same) _) =
     if isDeprecated annsR && not (isDeprecated annsL)
     then ["[D] " ++ k]
     else [""]
+prettyAPI_ _ _ _ = error "prettyAPI_: impossible pattern"
 
 indenter :: Int -> [String] -> [String]
 indenter i = map (replicate i ' ' ++)
@@ -156,7 +161,7 @@ prettyD1 ::
        Bool
     -> Map String (Tagged (Attach (Diff [Annotation]) (StatusTag ())) (Map String (Tagged (Attach (Diff [Annotation]) (StatusTag EntityContextType)) EntityContextType)))
     -> [String]
-prettyD1 l = SMap.foldlWithKey step initial
+prettyD1 _ = SMap.foldlWithKey step initial
 
     where
 

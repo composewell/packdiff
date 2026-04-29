@@ -30,12 +30,15 @@ common compile-options
                   -Wno-implicit-prelude
                   -Wno-missing-import-lists
                   -Wno-missing-deriving-strategies
+                  -Wno-missing-kind-signatures
                   -Wno-missing-local-signatures
+                  -Wno-missing-role-annotations
                   -Wno-missing-safe-haskell-mode
                   -Wno-missed-specialisations
                   -Wno-monomorphism-restriction
                   -Wno-prepositive-qualified-module
                   -Wno-unsafe
+                  -Wno-x-partial
 
 library
   import: compile-options
