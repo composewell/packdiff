@@ -1,0 +1,4 @@
+packages: .
+
+package packdiff
+  ghc-options: -Werror
