@@ -1,3 +1,10 @@
+-- |
+-- Module      : Pretty
+-- Copyright   : (c) 2022 Composewell Technologies
+-- License     : BSD-3-Clause
+-- Maintainer  : streamly@composewell.com
+-- Stability   : released
+-- Portability : GHC
 
 module Pretty
     ( prettyAPI

@@ -1,3 +1,11 @@
+-- |
+-- Module      : Diff
+-- Copyright   : (c) 2022 Composewell Technologies
+-- License     : BSD-3-Clause
+-- Maintainer  : streamly@composewell.com
+-- Stability   : released
+-- Portability : GHC
+
 module Diff
     ( StatusTag(..)
     , diffAPI
