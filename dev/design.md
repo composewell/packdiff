@@ -159,3 +159,17 @@ this is manageable with human review in the loop.
 Mitigation: use `--ignore-module <M>` to suppress known false-positive
 modules from CI output, and `--warn-on removals` to flag removals as
 warnings rather than hard failures until reviewed.
+
+## More things to do
+
+Additionally we should be able to:
+* specify a hoogle file instead of a package for the diff
+* specify an installed package for the diff
+* show the API summary for any rev, hackage version
+* show API summary for an installed package in the current ghc environment
+* show the doc of an api "package:module:definition".
+* show reverse deps of a package and which version are they using, show
+  maintainer email -- send mails about how to migrate.
+
+We can use a scope specifier to specify the source type e.g. hackage:, git:,
+github:, installed:, file: etc.
