@@ -735,6 +735,10 @@ depends on this, so a parser change that breaks it fails the test.
 
 Haskell libraries:
 
+All of the libraries below, except `hspec`, are `streamly-coreutils`,
+`optparse-applicative`, or their dependencies, so these two packages
+determine the dependency footprint of packdiff.
+
 | Library | Used for |
 |---------|----------|
 | `base` | Exceptions and cleanup (`bracket`, `uninterruptibleMask_`), environment variables, versions (`Data.Version`), the Windows console handler (`GHC.ConsoleHandler`). |
