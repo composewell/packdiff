@@ -152,9 +152,8 @@ A Hackage ref needs the package name to locate the release. Without
 `--package`, packdiff obtains the other ref first and takes the name
 from the `@package` line of its hoogle file. When there is no other
 ref to take the name from, i.e. both refs of `diff` or `check` are
-Hackage refs, or the ref of `api` is a Hackage ref, `--package` (or
-`package` in the configuration file) is required; without it packdiff
-exits with code 2.
+Hackage refs, or the ref of `api` is a Hackage ref, `--package` is
+required; without it packdiff exits with code 2.
 
 In a Hackage ref, the package is the source unpacked by `cabal get`.
 `--cabal-option` passes options such as `--project-file=<path>` to
@@ -507,7 +506,7 @@ Exit codes:
 |------|---------|
 | `0` | Success. For `diff` with `--fail-on`: no change reached the threshold. For `check`: the declared version is sufficient. `diff` without `--fail-on` and `api` always exit with 0 on success. |
 | `1` | The `--fail-on` threshold was reached, or `check` found the declared version insufficient. |
-| `2` | Usage or configuration error, including a missing external program. |
+| `2` | Usage error, including a missing external program. |
 | `3` | Failure to obtain an API: a failed `git` or `cabal` command (including their downloads), a build or haddock failure, or a hoogle file parse error. |
 
 Haskell programs exit with 1 on an uncaught exception, so all
@@ -522,26 +521,6 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 | `--no-cache` | Do not read or write the hoogle file cache. |
 | `--work-dir <path>` | Directory for work clones, unpacked Hackage sources, and their build directories. Default: `$XDG_CACHE_HOME/packdiff/work`. |
 | `--in-place` | Build git refs of the current repository by checking them out in the current working tree. See [In-place mode](#in-place-mode). |
-
----
-
-## Configuration File
-
-`packdiff.yaml` in the root of the current repository holds defaults
-for the flags, so that local and CI runs use the same settings. It is
-read from the working tree, not from the refs being compared. Each key
-is the long name of a flag; a repeatable flag takes a list:
-
-```yaml
-package: streamly
-ignore-module:
-  - Streamly.Prelude
-internal-module:
-  - "*.Internal.*"
-fail-on: breaking
-```
-
-Command-line flags override the configuration file.
 
 ---
 
@@ -829,6 +808,17 @@ normalise signatures before comparing them.
   PVP version, so PVP-based advice is never unsafe for dependents;
   semver needs separate rules for `0.x` versions.
 
+* A configuration file, e.g. `packdiff.yaml` in the repository root,
+  holding defaults for flags such as `--package`, `--ignore-module`,
+  `--internal-module`, `--fail-on` and `--cabal-option`, so that local
+  and CI runs use the same settings. It is not provided because there
+  are few flags; a YAML file needs a dependency (`yaml`, which pulls in
+  the C `libyaml` and `aeson`, or `HsYAML`); and it needs rules for
+  which repository's file applies and how command-line lists combine
+  with file lists. A wrapper script in the repository, called by both
+  CI and developers, gives the same settings today. If the list of
+  `--ignore-module` globs becomes long, a narrower option is
+  `--ignore-module-file <path>`, reading one glob per line.
 * An opt-in flag, e.g. `--deprecation-messages`, to print the
   deprecation message below each `[D]` line. The message is in the
   hoogle file, e.g. `<i>Deprecated: SVar is replaced by Channel.</i>`;
