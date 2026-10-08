@@ -735,7 +735,7 @@ depends on this, so a parser change that breaks it fails the test.
 
 Haskell libraries:
 
-All of the libraries below, except `hspec`, are `streamly-coreutils`,
+All of the non-test dependencies below are `streamly-coreutils`,
 `optparse-applicative`, or their dependencies, so these two packages
 determine the dependency footprint of packdiff.
 
