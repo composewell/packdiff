@@ -45,6 +45,8 @@ packdiff checks for the programs needed by the given refs before doing
 any work. If one is missing, it prints the program name and the ref
 that needs it, and exits with code 2.
 
+packdiff runs on Linux, macOS and Windows.
+
 ---
 
 ## Commands
@@ -574,7 +576,8 @@ dependencies come from the cabal store.
 Work clones and unpacked Hackage sources are deleted when the run
 ends, including on an exception, `SIGINT`, `SIGTERM` or `SIGHUP`. A
 directory left behind by a killed run is deleted by the next run,
-which detects it by its process id no longer running.
+which detects it by its process id no longer running (`kill` with
+signal 0 on POSIX systems, `OpenProcess` on Windows).
 
 Work clones are not kept across runs because their build directory is
 large and packdiff is run infrequently. For streamly, the haddock build
@@ -584,7 +587,10 @@ package version (`streamly-core-0.2.2` is 770 KB).
 
 The work directory is on disk under the XDG cache directory, not in
 `/tmp`, because `/tmp` is often a RAM-backed tmpfs and the build
-directory can be hundreds of MB.
+directory can be hundreds of MB. `$XDG_CACHE_HOME` stands for the
+directory returned by `getXdgDirectory XdgCache` from the `directory`
+package: `~/.cache` by default on Linux and macOS, `%LOCALAPPDATA%` on
+Windows.
 
 Hackage releases are not cloned; `cabal get` unpacks them into
 `<work-dir>/<pid>-<pkg>-<ver>`, which is handled the same way as a work
@@ -667,6 +673,11 @@ exception and on the signals below.
   exit before cleaning up. Otherwise the restore can fail on a
   `.git/index.lock` that an interrupted `git checkout` has not yet
   removed.
+* On Windows there are no `SIGTERM` or `SIGHUP` signals. The GHC
+  runtime delivers Ctrl-C as `UserInterrupt` as on POSIX systems.
+  packdiff installs a console handler (`GHC.ConsoleHandler`) that
+  throws an exception to the main thread on Ctrl-Break and on closing
+  the console window, which correspond to `SIGTERM` and `SIGHUP`.
 
 ### Effect on the user's repository
 
@@ -719,6 +730,41 @@ that the result equals the two files parsed separately and merged with
 `mergeNonConflictingAPI`. The
 [concatenation recipe](#comparing-a-package-with-several-packages)
 depends on this, so a parser change that breaks it fails the test.
+
+### Dependencies
+
+Haskell libraries:
+
+| Library | Used for |
+|---------|----------|
+| `base` | Exceptions and cleanup (`bracket`, `uninterruptibleMask_`), environment variables, versions (`Data.Version`), the Windows console handler (`GHC.ConsoleHandler`). |
+| `containers` | The API maps. |
+| `streamly-core` | Reading and parsing hoogle files, paths. |
+| `streamly-process` | Running `git` and `cabal`. |
+| `streamly-coreutils` | File system operations: creating and deleting directories, renaming files, finding programs in `PATH` (`Which`). |
+| `directory` | `getXdgDirectory`. A dependency of `streamly-coreutils` already. |
+| `optparse-applicative` | Command-line parsing and `--help`. |
+| `ansi-terminal` | Colors, including enabling ANSI escape codes in the Windows console. A dependency of `optparse-applicative` (through `prettyprinter-ansi-terminal`) already. |
+| `unix` (POSIX), `Win32` (Windows) | Signal handlers and checking whether a process is alive. Dependencies of `streamly-coreutils` already. |
+| `hspec` | Tests only. |
+
+The following are written in packdiff instead of adding a library:
+
+* A stable hash for cache keys and work clone names, e.g. 64-bit
+  FNV-1a. `hashable` is not used because its output may change between
+  versions, which would invalidate names on disk.
+* Glob matching for `--module`, `--ignore-module` and
+  `--internal-module`, supporting only `*`.
+* The token-level diff that highlights the differing parts of `-` and
+  `+` lines: a longest common subsequence on the tokens of two
+  signatures, which are short enough for an O(n·m) algorithm.
+
+`streamly-coreutils` depends on the full `streamly` package and,
+through it, on `hashable`, `unordered-containers`, `heaps`,
+`lockfree-queue`, `atomic-primops`, `network`, `monad-control` and
+others. It uses internal modules of `streamly`, so its bounds on
+`streamly` are tight (`>= 0.11 && < 0.12`). It is not on Hackage;
+packdiff cannot be released on Hackage until `streamly-coreutils` is.
 
 ---
 
