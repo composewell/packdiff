@@ -279,25 +279,25 @@ Example (illustrative):
 
 ```
 [D] Streamly.Data.Array.Foreign
-[C] Streamly.Data.Fold
-    [C] data Step s b
-        [A] Partial :: s -> Step s b
-    [A] instance Monad m => Functor (Fold m a)
-    [C] toHashMapIO
+[~] Streamly.Data.Fold
+    [~] data Step s b
+        [+] Partial :: s -> Step s b
+    [+] instance Monad m => Functor (Fold m a)
+    [~] toHashMapIO
         - toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
         + toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
-    [C] <>
+    [~] <>
         - infixr 6 <>
         + infixr 5 <>
-[A] Streamly.Data.Scanl (12 symbols)
-[C] Streamly.Data.Stream.Prelude
-    [A] useAcquire :: AcquireIO -> Config -> Config
+[+] Streamly.Data.Scanl (12 symbols)
+[~] Streamly.Data.Stream.Prelude
+    [+] useAcquire :: AcquireIO -> Config -> Config
     [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
-[R] Streamly.Data.Unfold.Old (25 symbols)
+[-] Streamly.Data.Unfold.Old (25 symbols)
 
 Internal modules:
-[C] Streamly.Internal.Data.Fold
-    [A] foldtM' :: Monad m => (s -> a -> m (Step s b)) -> m (Step s b) -> (s -> m b) -> Fold m a b
+[~] Streamly.Internal.Data.Fold
+    [+] foldtM' :: Monad m => (s -> a -> m (Step s b)) -> m (Step s b) -> (s -> m b) -> Fold m a b
 
 5 modules: 1 added, 1 removed, 2 changed, 1 deprecated; symbols: 3 added, 3 changed, 1 deprecated; 4 breaking; internal modules: 1 changed
 ```
@@ -306,13 +306,13 @@ Internal modules:
 
 | Sigil | Module line | Entity line |
 |-------|-------------|-------------|
-| `[A]` | The module is new in `ref2`. | The entity is new in `ref2`. |
-| `[R]` | The module exists in `ref1` and not in `ref2`. | The entity exists in `ref1` and not in `ref2`. |
-| `[C]` | The module exists in both refs and some entity in it changed. | The entity's definition changed. |
+| `[+]` | The module is new in `ref2`. | The entity is new in `ref2`. |
+| `[-]` | The module exists in `ref1` and not in `ref2`. | The entity exists in `ref1` and not in `ref2`. |
+| `[~]` | The module exists in both refs and some entity in it changed. | The entity's definition changed. |
 | `[D]` | The module is deprecated in `ref2` and was not deprecated in `ref1`. | The entity is deprecated in `ref2` and was not deprecated in `ref1`. |
 | `[U]` | The module is deprecated in `ref1` and not deprecated in `ref2`. | The entity is deprecated in `ref1` and not deprecated in `ref2`. |
 
-Below a `[C]` entity, a line starting with `-` is the definition in
+Below a `[~]` entity, a line starting with `-` is the definition in
 `ref1` and a line starting with `+` is the definition in `ref2`.
 
 ### Entities
@@ -326,7 +326,7 @@ Below a `[C]` entity, a line starting with `-` is the definition in
 | Instance | The instance head, e.g. `instance Monad m => Functor (Fold m a)`. |
 | Fixity | In source syntax, e.g. `infixr 5 <>`. |
 
-A `[C]` line names the entity: the name for a function or fixity, the
+A `[~]` line names the entity: the name for a function or fixity, the
 declaration head for a data type, newtype or class. The `-` and `+`
 lines below it give the full old and new definitions. For a data type
 or newtype whose head is unchanged, the lines below it are the changed
@@ -336,8 +336,8 @@ constructors and fields, each with its own sigil.
 
 | Module | Shown |
 |--------|-------|
-| Added | The module line only, with the number of entities in it: `[A] Streamly.Data.Scanl (12 symbols)`. |
-| Removed | The module line only, with the number of entities it had: `[R] Streamly.Data.Unfold.Old (25 symbols)`. |
+| Added | The module line only, with the number of entities in it: `[+] Streamly.Data.Scanl (12 symbols)`. |
+| Removed | The module line only, with the number of entities it had: `[-] Streamly.Data.Unfold.Old (25 symbols)`. |
 | Deprecated or undeprecated | The module line. Changed entities, if any, are listed below it as for a changed module. |
 | Changed | The module line and the changed entities. |
 
@@ -376,12 +376,12 @@ With `--group-by change`, the output has one section per sigil, in the
 order removed, changed, deprecated, undeprecated, added. Each section
 starts with a line naming it, e.g. `Removed:`. Entity lines in these
 sections are qualified with their module name, e.g.
-`[R] Streamly.Data.Fold.foo :: ...`.
+`[-] Streamly.Data.Fold.foo :: ...`.
 
 ### Color
 
-With color enabled, `[R]` and `-` lines are red, `[A]` and `+` lines
-are green, `[C]` lines are yellow, and `[D]` and `[U]` lines are
+With color enabled, `[-]` and `-` lines are red, `[+]` and `+` lines
+are green, `[~]` lines are yellow, and `[D]` and `[U]` lines are
 magenta. In a pair of `-` and `+` lines, the parts that differ are
 highlighted, so a changed constraint in a long signature stands out.
 
@@ -392,11 +392,12 @@ Scripts can rely on the following:
 * Each entity is on one line; lines are never wrapped.
 * Each nesting level is indented by 4 spaces.
 * After its indentation, every line except a section heading and the
-  summary starts with a sigil (`[A]`, `[R]`, `[C]`, `[D]`, `[U]`), `-`
+  summary starts with a sigil (`[+]`, `[-]`, `[~]`, `[D]`, `[U]`), `-`
   or `+`.
 * The summary is the last line.
 
-For example, `grep '^ *\[R\]'` lists every removal. An entity line does
+For example, `grep -F '[-]'` lists every removal; the brackets
+need `-F` or escaping (`grep '\[-\]'`). An entity line does
 not contain its module name in the default grouping, so attributing a
 line to its module requires the preceding module line.
 
@@ -424,7 +425,7 @@ packdiff compares definitions textually and cannot decide whether a
 changed signature is source-compatible. Every changed signature is
 classified as breaking. For example, removing the `Ord k` constraint
 from `toHashMapIO` above is compatible for callers but is still
-reported as `[C]` and classified as breaking.
+reported as `[~]` and classified as breaking.
 
 An added orphan instance is breaking under the PVP. The hoogle file
 does not mark instances as orphans, so added instances are classified
@@ -734,7 +735,7 @@ be resolved.
 Hoogle files generated by different GHC or haddock versions differ
 textually for the same API: `forall` placement, `Type` vs `*`, operator
 sections and instance ordering. A diff between such files reports
-false `[C]` entries. This affects `file:` refs written with a
+false `[~]` entries. This affects `file:` refs written with a
 different compiler, and would affect hoogle files downloaded from
 Hackage (see Future Work).
 
@@ -776,7 +777,7 @@ normalise signatures before comparing them.
   `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`
   (e.g. 770 KB for `streamly-core-0.2.2`). Downloading skips the
   build, but the file is rendered by Hackage's GHC and haddock
-  versions, which can produce false `[C]` entries against a locally
+  versions, which can produce false `[~]` entries against a locally
   built ref (Known Limitation 3). It would be opt-in, with a flag such
   as `--hackage-download`, and would shell out to `curl`, as
   cabal-install itself does, instead of adding an HTTP client library.
