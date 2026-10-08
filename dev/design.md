@@ -755,18 +755,9 @@ The following are written in packdiff instead of adding a library:
   versions, which would invalidate names on disk.
 * Glob matching for `--module`, `--ignore-module` and
   `--internal-module`, supporting only `*`.
-* The highlighting of the differing parts of `-` and `+` lines, built
-  on streamly-core's sequence functions. The two definitions are split
-  into tokens (`wordsBy`), the common prefix is dropped
-  (`dropCommonPrefixBy`), the common suffix is dropped the same way on
-  the reversed token sequences, and the remaining middle part of each
-  line is highlighted. For `toHashMapIO` the highlighted part is
-  `, Ord k`. With changes at several places in one signature, the span
-  from the first to the last difference is highlighted. streamly-core
-  has no longest-common-subsequence function; one would be needed to
-  highlight each difference separately. `dropCommonPrefixBy` is in
-  streamly-core's development branch and not yet in a release;
-  `stripPrefix` and `stripSuffix` are in 0.3.x.
+* Highlighting the differing parts of `-` and `+` lines: drop the
+  common token prefix and suffix using streamly-core's
+  `dropCommonPrefixBy` and highlight the rest.
 
 `streamly-process` already depends on the full `streamly` package, so
 `streamly-coreutils` adds little: `exceptions`, `time`, `directory`,
