@@ -105,13 +105,26 @@ covered only by `.`, which refers to the current directory.
 
 ### Package selection
 
+A repository can contain several packages, e.g. the streamly
+repository contains `streamly` and `streamly-core`, both listed in its
+`cabal.project`. packdiff compares the API of one package, so in such a
+repository the package has to be selected.
+
 | Flag | Description |
 |------|-------------|
-| `-p / --package <name>` | Package to compare. Repeatable. Defaults to the package in the current directory. |
+| `-p / --package <name>` | Package to compare, for repositories with several packages. Repeatable. |
 | `--cabal-file <path>` | Explicit path to the .cabal file. Defaults to auto-discovery. |
 
-In a multi-package repository, `--package` selects the package. A
-Hackage ref uses the package name to locate the release.
+Without `--package`:
+
+* If the current directory contains a .cabal file, that package is
+  compared.
+* Otherwise, if the repository has exactly one package, that package is
+  compared.
+* Otherwise packdiff lists the packages in the repository and exits
+  with code 2.
+
+A Hackage ref also needs the package name, to locate the release.
 
 When `--package` is given more than once, the APIs of all the listed
 packages are merged into one API before diffing. This compares a
