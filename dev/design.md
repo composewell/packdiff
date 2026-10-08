@@ -270,46 +270,140 @@ packdiff api . --format hoogle > api/streamly.txt
 
 ## Output Format
 
-Default output uses annotation sigils. Each changed module is listed as
-a top-level entry, with affected symbols nested below.
+The diff is printed as a tree: each module with a change is a top-level
+line, and the changed entities of the module are indented below it.
+There is no legend or banner; the sigils are explained in `--help` and
+in the user documentation. The last line is a summary.
+
+Example (illustrative):
 
 ```
----------------------------------
-API Annotations
----------------------------------
-[A] : Added
-[R] : Removed
-[C] : Changed
-[O] : Old definition
-[N] : New definition
-[D] : Deprecated
-[U] : Undeprecated
----------------------------------
-API diff
----------------------------------
+[D] Streamly.Data.Array.Foreign
+    Deprecated: Please use Streamly.Data.Array module from the streamly-core package.
+[C] Streamly.Data.Fold
+    [C] data Step s b
+        [A] Partial :: s -> Step s b
+    [A] instance Monad m => Functor (Fold m a)
+    [C] toHashMapIO
+        - toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+        + toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+    [C] <>
+        - infixr 6 <>
+        + infixr 5 <>
+[A] Streamly.Data.Scanl
+    [A] data Scanl m a b
+    [A] mkScanl :: Monad m => (b -> a -> b) -> b -> Scanl m a b
 [C] Streamly.Data.Stream.Prelude
     [A] useAcquire :: AcquireIO -> Config -> Config
     [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
-[C] Streamly.Data.Fold.Prelude
-    [C] toHashMapIO
-        [O] toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
-        [N] toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
-[A] Streamly.Data.Scanl
-[R] Streamly.Data.Unfold.Old
+        Deprecated: Use parBuffered instead.
+[R] Streamly.Data.Unfold.Old (25 symbols)
+
+Internal modules:
+[C] Streamly.Internal.Data.Fold
+    [A] foldtM' :: Monad m => (s -> a -> m (Step s b)) -> m (Step s b) -> (s -> m b) -> Fold m a b
+
+5 modules: 1 added, 1 removed, 2 changed, 1 deprecated; symbols: 3 added, 3 changed, 1 deprecated; 4 breaking; internal modules: 1 changed
 ```
 
-The module-level annotation describes the module itself:
+### Sigils
 
-| Sigil | Module |
-|-------|--------|
-| `[A]` | The module is new in `ref2`. |
-| `[R]` | The module exists in `ref1` and not in `ref2`. |
-| `[D]` | The module is deprecated in `ref2` and was not deprecated in `ref1`. |
-| `[U]` | The module is deprecated in `ref1` and not deprecated in `ref2`. |
-| `[C]` | The module exists in both refs and some symbol in it changed. |
+| Sigil | Module line | Entity line |
+|-------|-------------|-------------|
+| `[A]` | The module is new in `ref2`. | The entity is new in `ref2`. |
+| `[R]` | The module exists in `ref1` and not in `ref2`. | The entity exists in `ref1` and not in `ref2`. |
+| `[C]` | The module exists in both refs and some entity in it changed. | The entity's definition changed. |
+| `[D]` | The module is deprecated in `ref2` and was not deprecated in `ref1`. | The entity is deprecated in `ref2` and was not deprecated in `ref1`. |
+| `[U]` | The module is deprecated in `ref1` and not deprecated in `ref2`. | The entity is deprecated in `ref1` and not deprecated in `ref2`. |
 
-Modules matching `--internal-module` are printed in a separate
-"Internal API diff" section after the main diff.
+Below a `[C]` entity, a line starting with `-` is the definition in
+`ref1` and a line starting with `+` is the definition in `ref2`.
+
+### Entities
+
+| Entity | Line |
+|--------|------|
+| Function, class method, pattern synonym | The signature, e.g. `useAcquire :: AcquireIO -> Config -> Config`. |
+| Data type, newtype | The declaration head, e.g. `data Step s b`, with changed constructors and fields indented below it. |
+| Type synonym | The declaration, e.g. `type Config = ...`. |
+| Class | The declaration head, e.g. `class Monad m => MonadAsync m`. |
+| Instance | The instance head, e.g. `instance Monad m => Functor (Fold m a)`. |
+| Fixity | In source syntax, e.g. `infixr 5 <>`. |
+
+A `[C]` line names the entity: the name for a function or fixity, the
+declaration head for a data type, newtype or class. The `-` and `+`
+lines below it give the full old and new definitions. For a data type
+or newtype whose head is unchanged, the lines below it are the changed
+constructors and fields, each with its own sigil.
+
+### What each module line shows
+
+| Module | Shown |
+|--------|-------|
+| Added | The module line and all its entities, as `[A]` lines. |
+| Removed | The module line only, with the number of entities it had: `[R] Streamly.Data.Unfold.Old (25 symbols)`. |
+| Deprecated or undeprecated | The module line and the deprecation message. Changed entities, if any, are listed as for a changed module. |
+| Changed | The module line and the changed entities. |
+
+### Deprecation messages
+
+A `[D]` line is followed by the deprecation message, indented one level,
+starting with `Deprecated:`. The message is taken from the hoogle file;
+haddock markup (`<i>`, `<a>`) is removed and lines are joined.
+
+### Order
+
+Modules are sorted by name, in ascending order. Within a module,
+entities are grouped by kind in this order: data types and newtypes,
+type synonyms, classes, instances, pattern synonyms, functions,
+fixities. Within a group they are sorted by name. Constructors and
+fields keep their order in the hoogle file.
+
+### Internal modules
+
+Modules matching `--internal-module` are printed after the other
+modules, under the line `Internal modules:`, in the same format.
+
+### Summary line
+
+The last line summarises the diff. It counts modules by sigil, the
+entity lines of changed modules by sigil, the breaking changes (see
+[Change Classification](#change-classification)), and the internal
+modules by sigil. Counts that are zero are omitted. An empty diff
+prints `No API changes.`
+
+`-q` prints only the summary line. `--modules-only` prints the module
+lines and the summary line.
+
+### Grouping by change
+
+With `--group-by change`, the output has one section per sigil, in the
+order removed, changed, deprecated, undeprecated, added. Each section
+starts with a line naming it, e.g. `Removed:`. Entity lines in these
+sections are qualified with their module name, e.g.
+`[R] Streamly.Data.Fold.foo :: ...`.
+
+### Color
+
+With color enabled, `[R]` and `-` lines are red, `[A]` and `+` lines
+are green, `[C]` lines are yellow, and `[D]` and `[U]` lines are
+magenta. In a pair of `-` and `+` lines, the parts that differ are
+highlighted, so a changed constraint in a long signature stands out.
+
+### Line structure
+
+Scripts can rely on the following:
+
+* Each entity is on one line; lines are never wrapped.
+* Each nesting level is indented by 4 spaces.
+* After its indentation, every line except a section heading and the
+  summary starts with a sigil (`[A]`, `[R]`, `[C]`, `[D]`, `[U]`), `-`,
+  `+` or `Deprecated:`.
+* The summary is the last line.
+
+For example, `grep '^ *\[R\]'` lists every removal. An entity line does
+not contain its module name in the default grouping, so attributing a
+line to its module requires the preceding module line.
 
 ---
 
@@ -354,9 +448,9 @@ The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
 |------|-------------|
 | `--format <fmt>` | Output format: `text` (default). `api` also accepts `hoogle`. |
 | `--color <mode>` | Color control: `auto` (default), `always`, `never`. `auto` disables color when `NO_COLOR` is set or stdout is not a terminal. |
-| `--group-by <g>` | `module` (default): changes grouped by module. `change`: all additions, then all removals, and so on, for use in a changelog. |
-| `-q / --quiet` | Print a one-line summary only, no symbol detail. |
-| `--modules-only` | Collapse output to module-level entries, no symbol detail. |
+| `--group-by <g>` | `module` (default): changes grouped by module. `change`: one section per change kind, for use in a changelog. See [Grouping by change](#grouping-by-change). |
+| `-q / --quiet` | Print only the summary line. |
+| `--modules-only` | Print only the module lines and the summary line. |
 
 ### Filtering
 
@@ -702,6 +796,9 @@ normalise signatures before comparing them.
   PVP version, so PVP-based advice is never unsafe for dependents;
   semver needs separate rules for `0.x` versions.
 
+* A line-oriented output format for scripts, one change per line with
+  tab-separated fields, e.g. `R<TAB>Streamly.Data.Fold<TAB>foo :: ...`.
+  In the tree format, an entity line does not contain its module name.
 * More output formats for `--format`, if a use appears:
   * `markdown`: for PR comments and changelog entries. It needs no new
     dependency, but the `text` output in a code fence already renders
