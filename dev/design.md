@@ -811,9 +811,16 @@ normalise signatures before comparing them.
 
 ## Future Work
 
+Each entry ends with the new dependencies it needs, if any.
+
 * `installed:<version>` refs: diff a package installed in the current
-  GHC environment.
+  GHC environment. The hoogle file is found through `ghc-pkg`, and
+  exists only if the package was installed with its documentation.
+  Dependencies: no new library; the `ghc-pkg` program, which ships
+  with GHC.
 * Show the documentation of a single entity, `package:module:name`.
+  The parser already keeps the documentation of each entity.
+  Dependencies: none.
 * `--old-cabal-option` and `--new-cabal-option`: cabal options for
   `ref1` or `ref2` only, in addition to `--cabal-option`, in the same
   way as `--old-repo` and `--new-repo` refine `--repo`. Uses:
@@ -836,6 +843,8 @@ normalise signatures before comparing them.
   packdiff api -p streamly HEAD --format hoogle > new.txt
   packdiff diff file:old.txt file:new.txt
   ```
+
+  Dependencies: none.
 * Download Hackage hoogle files instead of building releases locally.
   Hackage serves the hoogle file of each release whose docs built at
   `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`
@@ -846,7 +855,7 @@ normalise signatures before comparing them.
   as `--hackage-download`, and would shell out to `curl`, as
   cabal-install itself does, instead of adding an HTTP client library.
   `curl` would then be required only when the flag is given.
-
+  Dependencies: no new library; the `curl` program.
 * Semver rules for `check`, as an alternative to the PVP, if a user
   asks for them. Under semver a breaking change bumps `X` in `X.Y.Z`,
   while the PVP accepts a bump of `B` in `A.B.C.D`, so applying PVP
@@ -854,8 +863,7 @@ normalise signatures before comparing them.
   breaking change where semver requires `2.0.0`. Semver versions are
   valid PVP versions, and cabal and Hackage read every version as a
   PVP version, so PVP-based advice is never unsafe for dependents;
-  semver needs separate rules for `0.x` versions.
-
+  semver needs separate rules for `0.x` versions. Dependencies: none.
 * A configuration file, e.g. `packdiff.yaml` in the repository root,
   holding defaults for flags such as `--package`, `--ignore-module`,
   `--internal-module`, `--fail-on` and `--cabal-option`, so that local
@@ -867,32 +875,37 @@ normalise signatures before comparing them.
   CI and developers, gives the same settings today. If the list of
   `--ignore-module` globs becomes long, a narrower option is
   `--ignore-module-file <path>`, reading one glob per line.
+  Dependencies: `yaml` or `HsYAML` for a YAML file;
+  `--ignore-module-file` needs none.
 * An opt-in flag, e.g. `--deprecation-messages`, to print the
   deprecation message below each `[D]` line. The message is in the
   hoogle file, e.g. `<i>Deprecated: SVar is replaced by Channel.</i>`;
   the haddock markup would be removed and wrapped lines joined. It is
   not printed by default because GHC already shows it to every user of
   the deprecated entity, messages can be long, and it adds a kind of
-  line to the line structure that scripts rely on.
+  line to the line structure that scripts rely on. Dependencies: none.
 * A line-oriented output format for scripts, one change per line with
   tab-separated fields, e.g. `R<TAB>Streamly.Data.Fold<TAB>foo :: ...`.
   In the tree format, an entity line does not contain its module name.
+  Dependencies: none.
 * More output formats, if a use appears. A `--format` flag for `diff`
   would be added with the first of them:
-  * `markdown`: for PR comments and changelog entries. It needs no new
-    dependency, but the `text` output in a code fence already renders
-    well in a PR comment.
+  * `markdown`: for PR comments and changelog entries. The `text`
+    output in a code fence already renders well in a PR comment.
+    Dependencies: none.
   * `json`: for other tools to consume. It needs either `aeson`, which
     brings a large dependency tree (`attoparsec`, `scientific`,
     `vector`, `unordered-containers`, `hashable` and more), or
     hand-written encoding of the output, which is nested lists of
     strings. The schema would need a `version` field and would be a
-    compatibility commitment.
+    compatibility commitment. Dependencies: `aeson`, or none with
+    hand-written encoding.
   * `github`: GitHub Actions annotations (`::error` / `::warning` lines
     on stdout), which GitHub shows in the workflow run summary.
     Hoogle files have no source locations, so the annotations cannot
     be attached to a file or line in the PR diff; the exit code and
     the `text` output in the log give nearly the same information.
+    Dependencies: none.
 
 ### Out of scope
 
