@@ -115,25 +115,34 @@ repository the package has to be selected.
 | `-p / --package <name>` | Package to compare, for repositories with several packages. |
 
 A package is needed when a ref is `.`, a git ref or a Hackage ref.
-`file:` refs need none. Without `--package`:
+`file:` refs need none.
 
-* If the current directory contains a .cabal file, that package is
-  compared.
-* Otherwise, if the repository has exactly one package, that package is
-  compared.
-* Otherwise packdiff lists the packages in the repository and exits
-  with code 2. Outside a repository, e.g. when both refs are Hackage
-  refs, it asks for `--package` and exits with code 2.
+packdiff does not parse `cabal.project` or .cabal files. It builds the
+package with `cabal haddock`, and cabal finds the package:
 
-A Hackage ref also needs the package name, to locate the release.
+* With `--package <name>`, packdiff runs `cabal haddock <name>` in the
+  root directory of each ref, and cabal finds the package by name
+  through its own project discovery. The package can be in a different
+  directory in the two refs.
+* Without `--package`, packdiff runs `cabal haddock` without a target in
+  the subdirectory of each ref that corresponds to the current directory
+  in the working tree, e.g. `core/` when packdiff is run in `core/`.
+  cabal builds the package in that directory. If there is none, e.g. in
+  the root of a repository with several packages, cabal prints an error
+  and packdiff exits with code 3.
 
-The package is selected by name, not by the path of its .cabal file.
-In each git ref, packdiff finds the package's directory through that
-revision's `cabal.project`, or the .cabal file in the root directory if
-there is no `cabal.project`, so the package can be in a different
-directory in the two refs. In a Hackage ref, the package is the source
-unpacked by `cabal get`. In a repository whose packages cabal cannot
-find without help, `--project-file` names the project file to use.
+The package name and version of a built ref come from the `@package`
+and `@version` lines of the generated hoogle file.
+
+A Hackage ref needs the package name to locate the release. Without
+`--package`, packdiff builds the other ref first and takes the name from
+its `@package` line. If both refs are Hackage refs, `--package` is
+required; without it packdiff exits with code 2.
+
+In a Hackage ref, the package is the source unpacked by `cabal get`.
+`--cabal-option` passes options such as `--project-file=<path>` to
+cabal; they apply to every ref that is built, so a project file given
+this way must exist in each of them.
 
 ### Comparing a package with several packages
 
@@ -192,11 +201,11 @@ packdiff diff hackage HEAD --fail-on breaking
 ### `packdiff check`
 
 Classifies the diff and prints the required version bump according to
-the PVP. The base version is the version in `ref1`'s .cabal file. For a
-`file:` ref, the version is taken from the `@version` line of the
-hoogle file; a file with more than one `@version` line, e.g. a
-concatenation of several packages, cannot be used with `check`, and
-packdiff exits with code 2.
+the PVP. The base version is `ref1`'s version, taken from the
+`@version` line of its hoogle file; this works the same way for git,
+Hackage and `file:` refs. A hoogle file with more than one `@version`
+line, e.g. a concatenation of several packages, cannot be used with
+`check`, and packdiff exits with code 2.
 
 PVP versions have the form `A.B.C.D`, where `A.B` is the major version.
 
@@ -209,8 +218,9 @@ PVP versions have the form `A.B.C.D`, where `A.B` is the major version.
 The breaking/non-breaking classification is defined in
 [Change Classification](#change-classification).
 
-`check` also compares the required bump against the version declared in
-`ref2`'s .cabal file. If the declared version is lower than the required
+`check` also compares the required bump against `ref2`'s version, the
+version declared in its .cabal file, taken from the `@version` line of
+its hoogle file. If the declared version is lower than the required
 version, `check` exits with code 1.
 
 ```sh
@@ -389,9 +399,8 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 
 | Flag | Description |
 |------|-------------|
-| `--project-file <path>` | cabal project file used to find the packages and build `.` and each git ref. The path is relative to the root of each ref. Hackage refs are built without a project file. |
 | `-w / --with-compiler <ghc>` | Compiler used to build each ref. |
-| `--cabal-option <opt>` | Extra option passed to `cabal haddock`. Repeatable. |
+| `--cabal-option <opt>` | Extra option passed to `cabal haddock` for every ref that is built, e.g. `--project-file=cabal.project.ci`. Repeatable. |
 | `--no-cache` | Do not read or write the hoogle file cache. |
 | `--work-dir <path>` | Directory for work clones and their build directories. Default: `$XDG_CACHE_HOME/packdiff/work`. |
 | `--in-place` | Build git refs of the current repository by checking them out in the current working tree. See [In-place mode](#in-place-mode). |
@@ -578,16 +587,23 @@ the haddock output of every ref to `dist-newstyle/`.
 ### Cache
 
 Hoogle files are cached under the XDG cache directory, keyed by
-(package, commit SHA or Hackage version, GHC version, haddock version,
-hash of the `--cabal-option` values and the project file). The build
-options are part of the key because cabal flags can change the API
-through CPP. The `.` ref is not cached.
+(package name, or the subdirectory when `--package` is not given;
+commit SHA or Hackage version; GHC version; haddock version; hash of
+the `--cabal-option` values). The cabal options are part of the key
+because cabal flags can change the API through CPP. The `.` ref is not
+cached.
 
 ### Testing
 
 Golden tests run the parse, diff, classify and render stages on pairs
 of small hoogle files checked into the test suite. These tests need no
 cabal builds or network access.
+
+One golden test parses the concatenation of two hoogle files and checks
+that the result equals the two files parsed separately and merged with
+`mergeNonConflictingAPI`. The
+[concatenation recipe](#comparing-a-package-with-several-packages)
+depends on this, so a parser change that breaks it fails the test.
 
 ---
 
