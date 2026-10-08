@@ -679,10 +679,26 @@ normalise signatures before comparing them.
 * Show the documentation of a single entity, `package:module:name`.
 * `--old-cabal-option` and `--new-cabal-option`: cabal options for
   `ref1` or `ref2` only, in addition to `--cabal-option`, in the same
-  way as `--old-repo` and `--new-repo` refine `--repo`. This allows a
-  project file that exists in only one of the refs, e.g.
-  `--new-cabal-option=--project-file=cabal.project.ci` when the old
-  revision has no `cabal.project.ci`.
+  way as `--old-repo` and `--new-repo` refine `--repo`. Uses:
+  * An old revision or Hackage release often builds with the current
+    GHC only with `--allow-newer` or a `--constraint`. Given with
+    `--cabal-option`, the option also applies to the new ref and can
+    change its build plan.
+  * With `--old-repo` and `--new-repo`, the two repositories can need
+    different project files or flags.
+  * A project file can exist in only one of the refs.
+
+  The cache key then hashes the effective options of each ref:
+  `--cabal-option` plus that ref's own options.
+
+  Without these flags, each side can be built separately and the
+  hoogle files diffed:
+
+  ```sh
+  packdiff api -p streamly v0.8.0 --format hoogle --cabal-option=--allow-newer > old.txt
+  packdiff api -p streamly HEAD --format hoogle > new.txt
+  packdiff diff file:old.txt file:new.txt
+  ```
 * Download Hackage hoogle files instead of building releases locally.
   Hackage serves the hoogle file of each release whose docs built at
   `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`
