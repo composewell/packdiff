@@ -374,21 +374,32 @@ can be diffed against any revision.
 ### Work clones
 
 Git refs are built in work clones under the work directory
-(`--work-dir`, default `$XDG_CACHE_HOME/packdiff/work`). There is one
-work clone per source repository, at `<work-dir>/<hash>`, where `<hash>`
-is a hash of the repository's absolute path or URL. Each work clone
-contains:
+(`--work-dir`, default `$XDG_CACHE_HOME/packdiff/work`). Each run
+creates one work clone per source repository, at
+`<work-dir>/<pid>-<hash>`, where `<hash>` is a hash of the repository's
+absolute path or URL. Each work clone contains:
 
 * `src/`: the clone, with the revision being built checked out.
 * `build/`: the cabal `--builddir`.
 
-The work clones persist across runs. Building a second revision in the
-same work clone recompiles only the modules that differ between the two
-revisions, so the second ref of a `diff` and later runs are incremental
-builds. The dependencies come from the cabal store in either case.
+When both refs of a `diff` come from the same repository, they are
+built one after the other in the same work clone, so the second build
+recompiles only the modules that differ between the two revisions. The
+dependencies come from the cabal store.
 
-A lock file in each work clone serialises concurrent packdiff runs on
-the same source repository.
+Work clones are deleted when the run ends, including on an exception
+or `SIGINT`. A work clone left behind by a killed run is deleted by
+the next run, which detects it by its process id no longer running.
+
+Work clones are not kept across runs because their build directory is
+large and packdiff is run infrequently. For streamly, the haddock build
+directory is about 160 MB. Repeated runs on the same revision are
+served from the hoogle file cache instead, which holds about 1 MB per
+package version (`streamly-core-0.2.2` is 770 KB).
+
+The work directory is on disk under the XDG cache directory, not in
+`/tmp`, because `/tmp` is often a RAM-backed tmpfs and the build
+directory can be hundreds of MB.
 
 **Local repositories.** The work clone is created with
 `git clone --shared --no-checkout <repo> src`. `--shared` copies no
@@ -403,8 +414,9 @@ objects are visible through the alternates file.
 
 A `--shared` clone breaks if the source repository deletes objects that
 the clone still references, e.g. when a branch is deleted and
-`git gc` runs. If any git command in a work clone fails, packdiff
-deletes the work clone and creates it again.
+`git gc` runs. A work clone exists only for the duration of one run and
+checks out revisions that are reachable in the source repository, so
+this does not happen in practice.
 
 **Remote repositories.** `--shared` applies only to local
 repositories. For a remote URL the work clone is created with
@@ -448,7 +460,7 @@ writes only the following:
 | Location | What is written | When |
 |----------|-----------------|------|
 | `dist-newstyle/` | Haddock output for `.`, the same as running `cabal haddock` by hand. | When `.` is a ref. |
-| Work directory | Work clones and their build directories. | When a ref is a git revision. Kept across runs. |
+| Work directory | Work clones and their build directories. | When a ref is a git revision. Deleted when the run ends. |
 | XDG cache directory | Cached hoogle files and Hackage downloads. | Unless `--no-cache` is given. |
 
 With `--in-place`, packdiff also changes `HEAD` and the tracked files
