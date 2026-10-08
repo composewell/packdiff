@@ -360,6 +360,27 @@ packdiff never runs `git checkout` in the user's working tree, so
 uncommitted changes are never touched and `.` can be diffed against any
 revision.
 
+### Effect on the user's repository
+
+packdiff does not modify tracked files, uncommitted changes, the index,
+`HEAD`, branches, tags or remotes. It writes only the following:
+
+| Location | What is written | When |
+|----------|-----------------|------|
+| `.git/worktrees/<name>` | Worktree metadata for a git ref. | During the run. Removed with `git worktree remove` when the run ends. |
+| Temporary directory | The checked-out source of a git ref and its build directory. | During the run. Deleted when the run ends. |
+| `dist-newstyle/` | Haddock output for `.`, the same as running `cabal haddock` by hand. | When `.` is a ref. |
+| XDG cache directory | Cached hoogle files and Hackage downloads. | Unless `--no-cache` is given. |
+
+If packdiff is killed before it cleans up, a stale worktree entry can
+remain under `.git/worktrees`. `git worktree prune` removes it. On
+startup packdiff removes stale worktrees that it created.
+
+The `git fetch` in
+[Comparing two local repositories](#comparing-two-local-repositories)
+is run by the user, not by packdiff. It adds a branch and objects to the
+current repository.
+
 ### Cache
 
 Hoogle files are cached under the XDG cache directory, keyed by
