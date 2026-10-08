@@ -253,10 +253,6 @@ packdiff check v1.2.0 HEAD
   -> no API changes detected: bump patch (1.2.0.1)
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--scheme <s>` | Versioning scheme: `pvp` (default) or `semver`. |
-
 ### `packdiff api`
 
 Prints the API of a single ref, with the released and internal modules
@@ -352,9 +348,8 @@ as non-breaking.
 
 ## Flags
 
-The flags for refs (`--repo`, `--old-repo`, `--new-repo`), packages
-(`--package`) and `check` (`--scheme`) are described in the sections
-above.
+The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
+(`--package`) are described in the sections above.
 
 ### Output and formatting
 
@@ -437,7 +432,6 @@ is the long name of a flag; a repeatable flag takes a list:
 
 ```yaml
 package: streamly
-scheme: pvp
 ignore-module:
   - Streamly.Prelude
 internal-module:
@@ -709,6 +703,15 @@ normalise signatures before comparing them.
   as `--hackage-download`, and would shell out to `curl`, as
   cabal-install itself does, instead of adding an HTTP client library.
   `curl` would then be required only when the flag is given.
+
+* Semver rules for `check`, as an alternative to the PVP, if a user
+  asks for them. Under semver a breaking change bumps `X` in `X.Y.Z`,
+  while the PVP accepts a bump of `B` in `A.B.C.D`, so applying PVP
+  rules to a package that follows semver accepts `1.2.0 → 1.3.0` for a
+  breaking change where semver requires `2.0.0`. Semver versions are
+  valid PVP versions, and cabal and Hackage read every version as a
+  PVP version, so PVP-based advice is never unsafe for dependents;
+  semver needs separate rules for `0.x` versions.
 
 ### Out of scope
 
