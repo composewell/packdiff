@@ -112,7 +112,7 @@ repository the package has to be selected.
 
 | Flag | Description |
 |------|-------------|
-| `-p / --package <name>` | Package to compare, for repositories with several packages. Repeatable. |
+| `-p / --package <name>` | Package to compare, for repositories with several packages. |
 
 Without `--package`:
 
@@ -132,17 +132,30 @@ directory in the two refs. In a Hackage ref, the package is the source
 unpacked by `cabal get`. In a repository whose packages cabal cannot
 find without help, `--project-file` names the project file to use.
 
-When `--package` is given more than once, the APIs of all the listed
-packages are merged into one API before diffing. This compares a
-package against its successor after a split, e.g. `streamly-0.8.3`
-against `streamly` + `streamly-core`. To give the two sides different
-package sets, a ref can name its packages explicitly:
+### Comparing a package with several packages
+
+packdiff compares one package with one package. When a package is split
+into several, e.g. `streamly-0.8.3` into `streamly` and `streamly-core`
+in streamly 0.9, the old package can be compared with the union of the
+new ones by concatenating their hoogle files:
 
 ```sh
-packdiff diff hackage:streamly-0.8.3 "git:HEAD{streamly,streamly-core}"
+packdiff api -p streamly HEAD --format hoogle > streamly.txt
+packdiff api -p streamly-core HEAD --format hoogle > streamly-core.txt
+cat streamly.txt streamly-core.txt > new.txt
+packdiff api -p streamly hackage:0.8.3 --format hoogle > old.txt
+packdiff diff file:old.txt file:new.txt
 ```
 
-(The exact syntax for per-ref package sets is to be decided.)
+The parser reads a concatenated file as one API: `@package` and
+`@version` lines are skipped and each `module` line starts a new
+module. Parsing the concatenated hoogle files of `streamly-core-0.2.2`
+and `streamly-0.10.1` gives the same 98 modules, with no differences,
+as parsing the two files separately and merging the results with
+`mergeNonConflictingAPI`.
+
+If the two packages have a module with the same name, the module from
+the later file replaces the one from the earlier file.
 
 ### `packdiff diff`
 
@@ -380,7 +393,7 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 that local and CI runs use the same settings:
 
 ```yaml
-packages: [streamly, streamly-core]
+package: streamly
 scheme: pvp
 ignore-modules:
   - Streamly.Prelude
@@ -399,14 +412,12 @@ Command-line flags override the configuration file.
 
 1. **Resolve** each ref to a source: a git revision, the working
    directory, a Hackage release, or a hoogle file.
-2. **Obtain** the hoogle file for each package of the ref.
+2. **Obtain** the hoogle file of the package in each ref.
 3. **Parse** each hoogle file into an API (`HoogleFileParser`).
-4. **Merge** the APIs of multiple packages into one API
-   (`mergeNonConflictingAPI`).
-5. **Diff** the two APIs (`Diff`).
-6. **Classify** each change as breaking or non-breaking.
-7. **Filter** modules and evaluate `--fail-on`.
-8. **Render** in the selected format (`Pretty`).
+4. **Diff** the two APIs (`Diff`).
+5. **Classify** each change as breaking or non-breaking.
+6. **Filter** modules and evaluate `--fail-on`.
+7. **Render** in the selected format (`Pretty`).
 
 ### Obtaining a hoogle file
 
