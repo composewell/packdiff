@@ -136,22 +136,25 @@ package with `cabal haddock`, and cabal finds the package:
   root directory of each ref, and cabal finds the package by name
   through its own project discovery. The package can be in a different
   directory in the two refs.
-* Without `--package`, packdiff runs `cabal haddock` without a target in
-  the subdirectory of each ref that corresponds to the current directory
-  in the working tree, e.g. `core/` when packdiff is run in `core/`.
-  For a ref of another repository, it runs in the root directory of
-  that repository.
-  cabal builds the package in that directory. If there is none, e.g. in
-  the root of a repository with several packages, cabal prints an error
-  and packdiff exits with code 3.
+* Without `--package`, packdiff runs `cabal haddock` without a target,
+  and cabal builds the package in the directory it runs in. For a ref
+  of the current repository, that directory is the subdirectory of the
+  ref that corresponds to the current directory, e.g. `core/` when
+  packdiff is run in `core/`. For a ref of another repository, it is
+  the root directory of that repository. If the directory contains no
+  package, e.g. the root of a repository with several packages, cabal
+  prints an error and packdiff exits with code 3.
 
 The package name and version of a built ref come from the `@package`
 and `@version` lines of the generated hoogle file.
 
 A Hackage ref needs the package name to locate the release. Without
-`--package`, packdiff builds the other ref first and takes the name from
-its `@package` line. If both refs are Hackage refs, `--package` is
-required; without it packdiff exits with code 2.
+`--package`, packdiff obtains the other ref first and takes the name
+from the `@package` line of its hoogle file. When there is no other
+ref to take the name from, i.e. both refs of `diff` or `check` are
+Hackage refs, or the ref of `api` is a Hackage ref, `--package` (or
+`package` in the configuration file) is required; without it packdiff
+exits with code 2.
 
 In a Hackage ref, the package is the source unpacked by `cabal get`.
 `--cabal-option` passes options such as `--project-file=<path>` to
@@ -203,7 +206,7 @@ packdiff diff
 packdiff diff hackage HEAD
 
 # two Hackage versions
-packdiff diff hackage:1.1.0 hackage:1.2.0
+packdiff diff -p streamly hackage:1.1.0 hackage:1.2.0
 
 # committed API baseline vs working directory
 packdiff diff file:api/streamly.txt .
@@ -263,7 +266,7 @@ committed to the repository as an API baseline and used later as a
 `file:` ref.
 
 ```sh
-packdiff api hackage:1.2.0
+packdiff api -p streamly hackage:1.2.0
 packdiff api . --format hoogle > api/streamly.txt
 ```
 
@@ -349,6 +352,10 @@ as non-breaking.
 
 ## Flags
 
+The flags for refs (`--repo`, `--old-repo`, `--new-repo`), packages
+(`--package`) and `check` (`--scheme`) are described in the sections
+above.
+
 ### Output and formatting
 
 | Flag | Description |
@@ -385,7 +392,7 @@ attached to a file or line.
 
 | Flag | Description |
 |------|-------------|
-| `--fail-on <types>` | Exit 1 if the diff contains any change of these types. Takes the same values as `--show`, plus `breaking` (removed and changed) and `any`. |
+| `--fail-on <types>` | `diff` only. Exit 1 if the diff contains any change of these types. Takes the same values as `--show`, plus `breaking` (removed and changed) and `any`. |
 
 Filters apply in this order:
 
@@ -401,7 +408,7 @@ Exit codes:
 
 | Code | Meaning |
 |------|---------|
-| `0` | Success, and no change reached the `--fail-on` threshold. `diff` and `api` without `--fail-on` always exit with 0 on success. |
+| `0` | Success. For `diff` with `--fail-on`: no change reached the threshold. For `check`: the declared version is sufficient. `diff` without `--fail-on` and `api` always exit with 0 on success. |
 | `1` | The `--fail-on` threshold was reached, or `check` found the declared version insufficient. |
 | `2` | Usage or configuration error, including a missing external program. |
 | `3` | Failure to obtain an API: a failed `git` or `cabal` command (including their downloads), a build or haddock failure, or a hoogle file parse error. |
@@ -416,7 +423,7 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 | `-w / --with-compiler <ghc>` | Compiler used to build each ref. |
 | `--cabal-option <opt>` | Extra option passed to `cabal haddock` for every ref that is built, e.g. `--project-file=cabal.project.ci`. Repeatable. |
 | `--no-cache` | Do not read or write the hoogle file cache. |
-| `--work-dir <path>` | Directory for work clones and their build directories. Default: `$XDG_CACHE_HOME/packdiff/work`. |
+| `--work-dir <path>` | Directory for work clones, unpacked Hackage sources, and their build directories. Default: `$XDG_CACHE_HOME/packdiff/work`. |
 | `--in-place` | Build git refs of the current repository by checking them out in the current working tree. See [In-place mode](#in-place-mode). |
 
 ---
@@ -490,8 +497,9 @@ recompiles only the modules that differ between the two revisions. The
 dependencies come from the cabal store.
 
 Work clones and unpacked Hackage sources are deleted when the run
-ends, including on an exception, `SIGINT`, `SIGTERM` or `SIGHUP`. A work clone left behind by a killed run is deleted by
-the next run, which detects it by its process id no longer running.
+ends, including on an exception, `SIGINT`, `SIGTERM` or `SIGHUP`. A
+directory left behind by a killed run is deleted by the next run,
+which detects it by its process id no longer running.
 
 Work clones are not kept across runs because their build directory is
 large and packdiff is run infrequently. For streamly, the haddock build
@@ -503,8 +511,9 @@ The work directory is on disk under the XDG cache directory, not in
 `/tmp`, because `/tmp` is often a RAM-backed tmpfs and the build
 directory can be hundreds of MB.
 
-Work clones are used for git refs; Hackage releases are unpacked by
-`cabal get` into a directory of the same form, `<work-dir>/<pid>-<pkg>-<ver>`.
+Hackage releases are not cloned; `cabal get` unpacks them into
+`<work-dir>/<pid>-<pkg>-<ver>`, which is handled the same way as a work
+clone.
 
 **Local repositories.** The work clone is created with
 `git clone --shared --no-checkout <repo> src`. `--shared` copies no
@@ -529,8 +538,11 @@ repositories. For a remote URL the work clone is created with
 `git fetch --depth 1 <url> <sha>`, which downloads only the files of
 that commit. The revision is first resolved to a SHA with
 `git ls-remote`, so a cached hoogle file for that SHA is used without
-any download. Fetching a commit by SHA requires the server to allow
-it; GitHub does.
+any download. `git ls-remote` lists only branches and tags, so a
+revision of a remote repository must be a branch, a tag or a full
+commit SHA; expressions such as `v1.0~2` or an abbreviated SHA are
+rejected with exit code 2. Fetching a commit by SHA requires the
+server to allow it; GitHub does.
 
 `git clone --shared`, `git fetch --depth` and `git ls-remote` are
 available in all Git versions packdiff will meet; there is no minimum
