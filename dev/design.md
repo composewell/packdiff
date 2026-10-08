@@ -113,7 +113,6 @@ repository the package has to be selected.
 | Flag | Description |
 |------|-------------|
 | `-p / --package <name>` | Package to compare, for repositories with several packages. Repeatable. |
-| `--cabal-file <path>` | Explicit path to the .cabal file. Defaults to auto-discovery. |
 
 Without `--package`:
 
@@ -125,6 +124,13 @@ Without `--package`:
   with code 2.
 
 A Hackage ref also needs the package name, to locate the release.
+
+The package is selected by name, not by the path of its .cabal file.
+In each git ref, packdiff finds the package's directory through that
+revision's `cabal.project`, so the package can be in a different
+directory in the two refs. In a Hackage ref, the package is the source
+unpacked by `cabal get`. In a repository whose packages cabal cannot
+find without help, `--project-file` names the project file to use.
 
 When `--package` is given more than once, the APIs of all the listed
 packages are merged into one API before diffing. This compares a
@@ -359,7 +365,7 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 
 | Flag | Description |
 |------|-------------|
-| `--project-file <path>` | cabal project file used to build each ref. |
+| `--project-file <path>` | cabal project file used to find the packages and build each ref. The path is relative to the root of each ref. |
 | `-w / --with-compiler <ghc>` | Compiler used to build each ref. |
 | `--cabal-option <opt>` | Extra option passed to `cabal haddock`. Repeatable. |
 | `--no-cache` | Do not read or write the hoogle file cache. |
