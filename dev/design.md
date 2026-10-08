@@ -311,9 +311,6 @@ The module-level annotation describes the module itself:
 Modules matching `--internal-module` are printed in a separate
 "Internal API diff" section after the main diff.
 
-The legend is shown in `text` format only. It is omitted in the other
-formats.
-
 ---
 
 ## Change Classification
@@ -355,19 +352,11 @@ The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
 
 | Flag | Description |
 |------|-------------|
-| `--format <fmt>` | Output format: `text` (default), `json`, `markdown`, `github`. `api` also accepts `hoogle`. |
+| `--format <fmt>` | Output format: `text` (default). `api` also accepts `hoogle`. |
 | `--color <mode>` | Color control: `auto` (default), `always`, `never`. `auto` disables color when `NO_COLOR` is set or stdout is not a terminal. |
 | `--group-by <g>` | `module` (default): changes grouped by module. `change`: all additions, then all removals, and so on, for use in a changelog. |
 | `-q / --quiet` | Print a one-line summary only, no symbol detail. |
 | `--modules-only` | Collapse output to module-level entries, no symbol detail. |
-
-The `json` output has a `version` field. The schema is versioned
-independently of packdiff and is documented with the release.
-
-The `github` format emits GitHub Actions annotations: `::error` for
-changes that match `--fail-on`, `::warning` for all other changes.
-Hoogle files have no source locations, so the annotations are not
-attached to a file or line.
 
 ### Filtering
 
@@ -712,6 +701,22 @@ normalise signatures before comparing them.
   valid PVP versions, and cabal and Hackage read every version as a
   PVP version, so PVP-based advice is never unsafe for dependents;
   semver needs separate rules for `0.x` versions.
+
+* More output formats for `--format`, if a use appears:
+  * `markdown`: for PR comments and changelog entries. It needs no new
+    dependency, but the `text` output in a code fence already renders
+    well in a PR comment.
+  * `json`: for other tools to consume. It needs either `aeson`, which
+    brings a large dependency tree (`attoparsec`, `scientific`,
+    `vector`, `unordered-containers`, `hashable` and more), or
+    hand-written encoding of the output, which is nested lists of
+    strings. The schema would need a `version` field and would be a
+    compatibility commitment.
+  * `github`: GitHub Actions annotations (`::error` / `::warning` lines
+    on stdout), which GitHub shows in the workflow run summary.
+    Hoogle files have no source locations, so the annotations cannot
+    be attached to a file or line in the PR diff; the exit code and
+    the `text` output in the log give nearly the same information.
 
 ### Out of scope
 
