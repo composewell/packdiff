@@ -759,12 +759,14 @@ The following are written in packdiff instead of adding a library:
   `+` lines: a longest common subsequence on the tokens of two
   signatures, which are short enough for an O(n·m) algorithm.
 
-`streamly-coreutils` depends on the full `streamly` package and,
-through it, on `hashable`, `unordered-containers`, `heaps`,
-`lockfree-queue`, `atomic-primops`, `network`, `monad-control` and
-others. It uses internal modules of `streamly`, so its bounds on
-`streamly` are tight (`>= 0.11 && < 0.12`). It is not on Hackage;
-packdiff cannot be released on Hackage until `streamly-coreutils` is.
+`streamly-process` already depends on the full `streamly` package, so
+`streamly-coreutils` adds little: `exceptions`, `time`, `directory`,
+`filepath`, `unix-compat` and `unix`/`Win32`, all GHC boot libraries
+except `unix-compat`. Both bound `streamly` to `< 0.12`.
+
+`streamly-coreutils` is not on Hackage yet. It is to be uploaded to
+Hackage before packdiff, since a package on Hackage cannot depend on
+one that is not.
 
 ---
 
