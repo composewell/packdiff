@@ -34,7 +34,8 @@ A ref has the form `<scope>:<value>`. A ref without a scope is a git ref.
 
 | Ref | Meaning |
 |-----|---------|
-| `<rev>`, `git:<rev>` | A git commit SHA, tag or branch, e.g. `v1.2.0`, `abc1234`. |
+| `<rev>`, `git:<rev>` | A git commit SHA, tag or branch in the current repository, e.g. `v1.2.0`, `abc1234`. |
+| `git:<repo>#<rev>` | Revision `<rev>` of another git repository. `<repo>` is a local path or a remote URL. Without `#<rev>`, `HEAD` of a local repository or the default branch of a remote one. |
 | `.` | The current working directory, including uncommitted changes. |
 | `hackage:<version>` | A specific published Hackage release. |
 | `hackage:latest` | The latest published Hackage release. |
@@ -44,20 +45,27 @@ A ref has the form `<scope>:<value>`. A ref without a scope is a git ref.
 `hackage` alone is accepted as a shorthand for `hackage:latest`. A git
 tag or branch named `hackage` can be given as `git:hackage`.
 
-### Comparing two local repositories
-
-Git refs are resolved in the repository of the current directory. To
-compare against a branch in another local repository, fetch it into the
-current repository first; it is then an ordinary git ref:
+`#` separates the repository from the revision because `@` occurs in
+both scp-style URLs (`git@github.com:...`) and revisions (`HEAD@{1}`).
 
 ```sh
-git fetch ../streamly-other my-branch:other/my-branch
-packdiff diff other/my-branch HEAD
+packdiff diff git:https://github.com/composewell/streamly#v0.10.0 .
+packdiff diff git:git@github.com:composewell/streamly.git#master HEAD
+```
+
+### Comparing two local repositories
+
+A revision of another local repository is given as
+`git:<path>#<rev>`:
+
+```sh
+packdiff diff git:../streamly-other#my-branch HEAD
+packdiff diff git:../repo-a#master git:../repo-b#master
 ```
 
 This works for clones of the same repository and for unrelated
 repositories. Worktrees created with `git worktree add` share one
-repository, so their branches need no fetch.
+repository, so their branches are also plain git refs in each other.
 
 Only committed states can be compared this way. Uncommitted changes are
 covered only by `.`, which refers to the current directory.
@@ -310,6 +318,8 @@ exceptions must be caught at the top level and mapped to 2 or 3.
 | `--cabal-option <opt>` | Extra option passed to `cabal haddock`. Repeatable. |
 | `--no-hackage-download` | Build Hackage releases locally instead of downloading their hoogle files. |
 | `--no-cache` | Do not read or write the hoogle file cache. |
+| `--work-dir <path>` | Directory for work clones and their build directories. Default: `$XDG_CACHE_HOME/packdiff/work`. |
+| `--in-place` | Build git refs of the current repository by checking them out in the current working tree. See [In-place mode](#in-place-mode). |
 
 ---
 
@@ -351,35 +361,99 @@ Command-line flags override the configuration file.
 
 | Source | Method |
 |--------|--------|
-| git revision | `git worktree add` into a temporary directory, then `cabal haddock --haddock-hoogle` with a separate `--builddir` per ref. |
+| git revision, local repository | Check out the revision in a work clone made with `git clone --shared`, then run `cabal haddock --haddock-hoogle` with the work clone's build directory. |
+| git revision, remote repository | Resolve the revision to a commit SHA with `git ls-remote`, check the cache, then `git fetch --depth 1 <url> <sha>` into a work clone and build as above. |
 | `.` | `cabal haddock --haddock-hoogle` in the working directory. |
 | Hackage | Download `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`. If Hackage has no docs for the release, fall back to `cabal get <pkg>-<ver>` and a local haddock build. |
 | `file:` | Read the file. |
 
-packdiff never runs `git checkout` in the user's working tree, so
-uncommitted changes are never touched and `.` can be diffed against any
-revision.
+Unless `--in-place` is given, packdiff never runs `git checkout` in the
+user's working tree, so uncommitted changes are never touched and `.`
+can be diffed against any revision.
+
+### Work clones
+
+Git refs are built in work clones under the work directory
+(`--work-dir`, default `$XDG_CACHE_HOME/packdiff/work`). There is one
+work clone per source repository, at `<work-dir>/<hash>`, where `<hash>`
+is a hash of the repository's absolute path or URL. Each work clone
+contains:
+
+* `src/`: the clone, with the revision being built checked out.
+* `build/`: the cabal `--builddir`.
+
+The work clones persist across runs. Building a second revision in the
+same work clone recompiles only the modules that differ between the two
+revisions, so the second ref of a `diff` and later runs are incremental
+builds. The dependencies come from the cabal store in either case.
+
+A lock file in each work clone serialises concurrent packdiff runs on
+the same source repository.
+
+**Local repositories.** The work clone is created with
+`git clone --shared --no-checkout <repo> src`. `--shared` copies no
+objects: the clone records the source repository's object directory in
+`.git/objects/info/alternates` and reads objects from there. It works
+across filesystems, because the alternates file holds a path, not hard
+links. (Without `--shared`, a local clone hard-links the object files
+and copies them when the source is on another filesystem.) A revision is
+resolved to a SHA in the source repository and checked out with
+`git -C src checkout --detach <sha>`; no fetch is needed because the
+objects are visible through the alternates file.
+
+A `--shared` clone breaks if the source repository deletes objects that
+the clone still references, e.g. when a branch is deleted and
+`git gc` runs. If any git command in a work clone fails, packdiff
+deletes the work clone and creates it again.
+
+**Remote repositories.** `--shared` applies only to local
+repositories. For a remote URL the work clone is created with
+`git init`, and each revision is fetched with
+`git fetch --depth 1 <url> <sha>`, which downloads only the files of
+that commit. The revision is first resolved to a SHA with
+`git ls-remote`, so a cached hoogle file for that SHA is used without
+any download. Fetching a commit by SHA requires the server to allow
+it; GitHub does.
+
+`git clone --shared`, `git fetch --depth` and `git ls-remote` are
+available in all Git versions packdiff will meet; there is no minimum
+Git version.
+
+### In-place mode
+
+With `--in-place`, git refs of the current repository are checked out
+in the current working tree and built in the default `dist-newstyle`.
+This reuses the existing build of the working tree and needs no work
+clone, so it is the fastest mode when `dist-newstyle` is already built.
+
+* packdiff exits with code 2 if tracked files have uncommitted changes.
+  Untracked files are left in place and are part of every build.
+* packdiff prints the current branch (or the SHA, if `HEAD` is
+  detached) before the first checkout, and checks it out again when the
+  run ends, including on an exception or `SIGINT`. If packdiff is
+  killed with `SIGKILL`, the tree stays on the last revision built, and
+  the printed branch tells the user what to check out.
+* `.` is the same as `HEAD`, because the tree has no uncommitted
+  changes.
+* Refs of other repositories (`git:<repo>#<rev>`) still use work
+  clones.
 
 ### Effect on the user's repository
 
-packdiff does not modify tracked files, uncommitted changes, the index,
-`HEAD`, branches, tags or remotes. It writes only the following:
+Without `--in-place`, packdiff writes nothing inside the user's
+repository, including `.git`. It does not modify tracked files,
+uncommitted changes, the index, `HEAD`, branches, tags or remotes. It
+writes only the following:
 
 | Location | What is written | When |
 |----------|-----------------|------|
-| `.git/worktrees/<name>` | Worktree metadata for a git ref. | During the run. Removed with `git worktree remove` when the run ends. |
-| Temporary directory | The checked-out source of a git ref and its build directory. | During the run. Deleted when the run ends. |
 | `dist-newstyle/` | Haddock output for `.`, the same as running `cabal haddock` by hand. | When `.` is a ref. |
+| Work directory | Work clones and their build directories. | When a ref is a git revision. Kept across runs. |
 | XDG cache directory | Cached hoogle files and Hackage downloads. | Unless `--no-cache` is given. |
 
-If packdiff is killed before it cleans up, a stale worktree entry can
-remain under `.git/worktrees`. `git worktree prune` removes it. On
-startup packdiff removes stale worktrees that it created.
-
-The `git fetch` in
-[Comparing two local repositories](#comparing-two-local-repositories)
-is run by the user, not by packdiff. It adds a branch and objects to the
-current repository.
+With `--in-place`, packdiff also changes `HEAD` and the tracked files
+during the run, restores the original branch at the end, and writes
+the haddock output of every ref to `dist-newstyle/`.
 
 ### Cache
 
