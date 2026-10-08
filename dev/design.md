@@ -715,6 +715,18 @@ the `--cabal-option` values). The cabal options are part of the key
 because cabal flags can change the API through CPP. The `.` ref is not
 cached.
 
+The dependency build plan is not part of the key. A different
+`cabal.project.local`, freeze file or package index can change the
+output, e.g. the instances or re-exported entities that come from a
+dependency, and a cached file then no longer matches a fresh build.
+`--no-cache` forces a rebuild.
+
+Entries are about 1 MB each and are never evicted. Deleting
+`$XDG_CACHE_HOME/packdiff` clears the cache.
+
+Entries are written to a temporary file and renamed into place, so
+concurrent runs never read a partly written entry.
+
 ### Testing
 
 Golden tests run the parse, diff, classify and render stages on pairs
