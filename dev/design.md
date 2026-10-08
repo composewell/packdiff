@@ -700,7 +700,7 @@ writes only the following:
 |----------|-----------------|------|
 | `dist-newstyle/` | Haddock output for `.`, the same as running `cabal haddock` by hand. | When `.` is a ref. |
 | Work directory | Work clones, unpacked Hackage sources, and their build directories. | When a ref is a git or Hackage ref. Deleted when the run ends. |
-| XDG cache directory | Cached hoogle files. | Unless `--no-cache` is given. |
+| `$XDG_CACHE_HOME/packdiff/hoogle` | Cached hoogle files. | Unless `--no-cache` is given. |
 
 With `--in-place`, packdiff also changes `HEAD` and the tracked files
 during the run, restores the original branch at the end, and writes
@@ -708,7 +708,7 @@ the haddock output of every ref to `dist-newstyle/`.
 
 ### Cache
 
-Hoogle files are cached under the XDG cache directory, keyed by
+Hoogle files are cached in `$XDG_CACHE_HOME/packdiff/hoogle`, keyed by
 (package name, or the subdirectory when `--package` is not given;
 commit SHA or Hackage version; GHC version; haddock version; hash of
 the `--cabal-option` values). The cabal options are part of the key
@@ -722,7 +722,9 @@ dependency, and a cached file then no longer matches a fresh build.
 `--no-cache` forces a rebuild.
 
 Entries are about 1 MB each and are never evicted. Deleting
-`$XDG_CACHE_HOME/packdiff` clears the cache.
+`$XDG_CACHE_HOME/packdiff/hoogle` clears the cache. The cache is kept
+separate from the work directory, `$XDG_CACHE_HOME/packdiff/work`, so
+clearing it cannot remove the work clones of a running packdiff.
 
 Entries are written to a temporary file and renamed into place, so
 concurrent runs never read a partly written entry.
