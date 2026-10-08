@@ -273,7 +273,7 @@ packdiff api . --format hoogle > api/streamly.txt
 The diff is printed as a tree: each module with a change is a top-level
 line, and the changed entities of the module are indented below it.
 There is no legend or banner; the sigils are explained in `--help` and
-in the user documentation. The last line is a summary.
+in the user documentation. The output ends with a summary.
 
 Example (illustrative):
 
@@ -299,7 +299,10 @@ Internal modules:
 [~] Streamly.Internal.Data.Fold
     [+] foldtM' :: Monad m => (s -> a -> m (Step s b)) -> m (Step s b) -> (s -> m b) -> Fold m a b
 
-5 modules: 1 added [+], 1 removed [-], 2 changed [~], 1 deprecated [D]; symbols: 3 added [+], 3 changed [~], 1 deprecated [D]; 4 breaking; internal modules: 1 changed [~]
+Modules: 1 added [+], 1 removed [-], 2 changed [~], 1 deprecated [D]
+Symbols: 3 added [+], 3 changed [~], 1 deprecated [D]
+Internal modules: 1 changed [~]
+Breaking changes: 4
 ```
 
 ### Sigils
@@ -366,18 +369,25 @@ fields keep their order in the hoogle file.
 Modules matching `--internal-module` are printed after the other
 modules, under the line `Internal modules:`, in the same format.
 
-### Summary line
+### Summary
 
-The last line summarises the diff. It counts modules by sigil, the
-entity lines of changed modules by sigil, the breaking changes (see
-[Change Classification](#change-classification)), and the internal
-modules by sigil. Each count is followed by its sigil, so the summary
-also explains the sigils used in the output. Counts that are zero are
-omitted. An empty diff
-prints `No API changes.`
+The output ends with a blank line followed by the summary, one line per
+kind of count:
 
-`-q` prints only the summary line. `--modules-only` prints the module
-lines and the summary line.
+| Line | Counts |
+|------|--------|
+| `Modules:` | Modules, by sigil. |
+| `Symbols:` | Entity lines of changed modules, by sigil. |
+| `Internal modules:` | Internal modules, by sigil. |
+| `Breaking changes:` | Module and entity changes classified as breaking (see [Change Classification](#change-classification)). |
+
+Each count is followed by its sigil, so the summary also explains the
+sigils used in the output. Counts that are zero are omitted, and a line
+whose counts are all zero is omitted. An empty diff prints
+`No API changes.`
+
+`-q` prints only the summary. `--modules-only` prints the module lines
+and the summary.
 
 ### Grouping by change
 
@@ -403,13 +413,14 @@ Scripts can rely on the following:
 * After its indentation, every line except a section heading and the
   summary starts with a sigil (`[+]`, `[-]`, `[~]`, `[D]`, `[U]`), `-`
   or `+`.
-* The summary is the last line.
+* The summary lines come last; each starts with `Modules:`,
+  `Symbols:`, `Internal modules:` or `Breaking changes:`.
 
 For example, `grep '^ *\[-\]'` lists every removal; the pattern is
-anchored to the start of the line because the summary line also
-contains sigils. An entity line does
-not contain its module name in the default grouping, so attributing a
-line to its module requires the preceding module line.
+anchored to the start of the line because the summary lines also
+contain sigils. An entity line does not contain its module name in the
+default grouping, so attributing a line to its module requires the
+preceding module line.
 
 ---
 
@@ -455,8 +466,8 @@ The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
 | `--format <fmt>` | Output format: `text` (default). `api` also accepts `hoogle`. |
 | `--color <mode>` | Color control: `auto` (default), `always`, `never`. `auto` disables color when `NO_COLOR` is set or stdout is not a terminal. |
 | `--group-by <g>` | `module` (default): changes grouped by module. `change`: one section per change kind, for use in a changelog. See [Grouping by change](#grouping-by-change). |
-| `-q / --quiet` | Print only the summary line. |
-| `--modules-only` | Print only the module lines and the summary line. |
+| `-q / --quiet` | Print only the summary. |
+| `--modules-only` | Print only the module lines and the summary. |
 
 ### Filtering
 
