@@ -289,9 +289,7 @@ Example (illustrative):
     [C] <>
         - infixr 6 <>
         + infixr 5 <>
-[A] Streamly.Data.Scanl
-    [A] data Scanl m a b
-    [A] mkScanl :: Monad m => (b -> a -> b) -> b -> Scanl m a b
+[A] Streamly.Data.Scanl (12 symbols)
 [C] Streamly.Data.Stream.Prelude
     [A] useAcquire :: AcquireIO -> Config -> Config
     [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
@@ -338,10 +336,15 @@ constructors and fields, each with its own sigil.
 
 | Module | Shown |
 |--------|-------|
-| Added | The module line and all its entities, as `[A]` lines. |
+| Added | The module line only, with the number of entities in it: `[A] Streamly.Data.Scanl (12 symbols)`. |
 | Removed | The module line only, with the number of entities it had: `[R] Streamly.Data.Unfold.Old (25 symbols)`. |
 | Deprecated or undeprecated | The module line. Changed entities, if any, are listed below it as for a changed module. |
 | Changed | The module line and the changed entities. |
+
+The entities of an added or removed module are not listed, so that a
+large new module does not fill the diff. `packdiff api --module <M>
+<ref>` prints them: with `ref2` for an added module, with `ref1` for a
+removed one.
 
 ### Order
 
@@ -451,7 +454,7 @@ The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
 | `--show <types>` | Show only these change types. Values: `added`, `removed`, `changed`, `deprecated`, `undeprecated`. Mutually exclusive with `--hide`. |
 | `--hide <types>` | Hide these change types. Mutually exclusive with `--show`. |
 | `--breaking-only` | Shorthand for `--show removed,changed`. |
-| `--module <glob>` | Narrow the diff to modules matching the glob. Repeatable. |
+| `--module <glob>` | Narrow the output of `diff` or `api` to modules matching the glob. Repeatable. |
 | `--ignore-module <glob>` | Exclude modules matching the glob. Repeatable. Used to suppress known re-export false positives. |
 | `--internal-module <glob>` | Treat matching modules as internal. Repeatable. Default: `*.Internal.*` and `*.Internal`. |
 
