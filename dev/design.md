@@ -279,7 +279,6 @@ Example (illustrative):
 
 ```
 [D] Streamly.Data.Array.Foreign
-    Deprecated: Please use Streamly.Data.Array module from the streamly-core package.
 [C] Streamly.Data.Fold
     [C] data Step s b
         [A] Partial :: s -> Step s b
@@ -296,7 +295,6 @@ Example (illustrative):
 [C] Streamly.Data.Stream.Prelude
     [A] useAcquire :: AcquireIO -> Config -> Config
     [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
-        Deprecated: Use parBuffered instead.
 [R] Streamly.Data.Unfold.Old (25 symbols)
 
 Internal modules:
@@ -342,14 +340,8 @@ constructors and fields, each with its own sigil.
 |--------|-------|
 | Added | The module line and all its entities, as `[A]` lines. |
 | Removed | The module line only, with the number of entities it had: `[R] Streamly.Data.Unfold.Old (25 symbols)`. |
-| Deprecated or undeprecated | The module line and the deprecation message. Changed entities, if any, are listed as for a changed module. |
+| Deprecated or undeprecated | The module line. Changed entities, if any, are listed below it as for a changed module. |
 | Changed | The module line and the changed entities. |
-
-### Deprecation messages
-
-A `[D]` line is followed by the deprecation message, indented one level,
-starting with `Deprecated:`. The message is taken from the hoogle file;
-haddock markup (`<i>`, `<a>`) is removed and lines are joined.
 
 ### Order
 
@@ -397,8 +389,8 @@ Scripts can rely on the following:
 * Each entity is on one line; lines are never wrapped.
 * Each nesting level is indented by 4 spaces.
 * After its indentation, every line except a section heading and the
-  summary starts with a sigil (`[A]`, `[R]`, `[C]`, `[D]`, `[U]`), `-`,
-  `+` or `Deprecated:`.
+  summary starts with a sigil (`[A]`, `[R]`, `[C]`, `[D]`, `[U]`), `-`
+  or `+`.
 * The summary is the last line.
 
 For example, `grep '^ *\[R\]'` lists every removal. An entity line does
@@ -796,6 +788,13 @@ normalise signatures before comparing them.
   PVP version, so PVP-based advice is never unsafe for dependents;
   semver needs separate rules for `0.x` versions.
 
+* An opt-in flag, e.g. `--deprecation-messages`, to print the
+  deprecation message below each `[D]` line. The message is in the
+  hoogle file, e.g. `<i>Deprecated: SVar is replaced by Channel.</i>`;
+  the haddock markup would be removed and wrapped lines joined. It is
+  not printed by default because GHC already shows it to every user of
+  the deprecated entity, messages can be long, and it adds a kind of
+  line to the line structure that scripts rely on.
 * A line-oriented output format for scripts, one change per line with
   tab-separated fields, e.g. `R<TAB>Streamly.Data.Fold<TAB>foo :: ...`.
   In the tree format, an entity line does not contain its module name.
