@@ -677,6 +677,12 @@ normalise signatures before comparing them.
 * `installed:<version>` refs: diff a package installed in the current
   GHC environment.
 * Show the documentation of a single entity, `package:module:name`.
+* `--old-cabal-option` and `--new-cabal-option`: cabal options for
+  `ref1` or `ref2` only, in addition to `--cabal-option`, in the same
+  way as `--old-repo` and `--new-repo` refine `--repo`. This allows a
+  project file that exists in only one of the refs, e.g.
+  `--new-cabal-option=--project-file=cabal.project.ci` when the old
+  revision has no `cabal.project.ci`.
 * Download Hackage hoogle files instead of building releases locally.
   Hackage serves the hoogle file of each release whose docs built at
   `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`
