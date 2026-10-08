@@ -21,7 +21,7 @@ documentation.
 
 | Program | Needed for |
 |---------|------------|
-| `git` | Git refs: `<rev>`, `git:<rev>`, `git:<repo>#<rev>`. Any version. |
+| `git` | Git refs: `<rev>` and `git:<rev>`. Any version. |
 | `cabal` (cabal-install) | Every ref except `file:`: git refs and `.` are built with it, and `hackage:` refs are resolved, downloaded and built with it. |
 | `ghc` | Same as `cabal`. Selected with `-w`; otherwise the `ghc` in `PATH`. |
 | `haddock` | Same as `cabal`. cabal uses the `haddock` that matches the selected `ghc`. |
@@ -31,7 +31,8 @@ Network access is needed for:
 * `hackage:` refs: `cabal get` downloads the source of the release.
   Resolving versions uses cabal's local package index, which must be
   present and up to date (`cabal update`).
-* `git:<url>#<rev>` refs: `git ls-remote` and `git fetch`.
+* Git refs of a remote repository (`--repo <url>`): `git ls-remote`
+  and `git fetch`.
 * Building any ref whose dependencies are not yet in the cabal store.
 
 `file:` refs need none of these. `diff file:a.txt file:b.txt` runs
@@ -68,8 +69,7 @@ ref, except `.` and `hackage`, which are described below.
 
 | Ref | Meaning |
 |-----|---------|
-| `<rev>`, `git:<rev>` | A git commit SHA, tag or branch in the current repository, e.g. `v1.2.0`, `abc1234`. |
-| `git:<repo>#<rev>` | Revision `<rev>` of another git repository. `<repo>` is a local path or a remote URL. Without `#<rev>`, `HEAD` of a local repository or the default branch of a remote one. |
+| `<rev>`, `git:<rev>` | A git commit SHA, tag or branch, e.g. `v1.2.0`, `abc1234`. It is resolved in the current repository unless `--repo`, `--old-repo` or `--new-repo` names another one. |
 | `.` | The current working directory, including uncommitted changes. |
 | `hackage:<version>` | A specific published Hackage release. |
 | `hackage:latest` | The latest published Hackage release. |
@@ -78,30 +78,42 @@ ref, except `.` and `hackage`, which are described below.
 `hackage` alone is accepted as a shorthand for `hackage:latest`. A git
 tag or branch named `hackage` can be given as `git:hackage`.
 
-`#` separates the repository from the revision because `@` occurs in
-both scp-style URLs (`git@github.com:...`) and revisions (`HEAD@{1}`).
+### Refs of other repositories
+
+A git ref is a plain revision. The repository it belongs to is given by
+a flag, not embedded in the ref:
+
+| Flag | Description |
+|------|-------------|
+| `--repo <path-or-url>` | Repository for git refs: a local path or a remote URL. With `diff` and `check` it applies to both refs. Default: the repository of the current directory. |
+| `--old-repo <path-or-url>` | Repository for `ref1` only. Overrides `--repo` for `ref1`. |
+| `--new-repo <path-or-url>` | Repository for `ref2` only. Overrides `--repo` for `ref2`. |
 
 ```sh
-packdiff diff git:https://github.com/composewell/streamly#v0.10.0 .
-packdiff diff git:git@github.com:composewell/streamly.git#master HEAD
-```
+# two tags of a remote repository, without a local clone
+packdiff diff --repo https://github.com/composewell/streamly v0.9.0 v0.10.0
 
-### Comparing two local repositories
+# a branch of another local repository vs HEAD of the current one
+packdiff diff --old-repo ../streamly-other my-branch HEAD
 
-A revision of another local repository is given as
-`git:<path>#<rev>`:
+# branches of two different repositories
+packdiff diff --old-repo ../repo-a --new-repo ../repo-b master master
 
-```sh
-packdiff diff git:../streamly-other#my-branch HEAD
-packdiff diff git:../repo-a#master git:../repo-b#master
+# API of a tag in a remote repository
+packdiff api --repo https://github.com/composewell/streamly v0.10.0
 ```
 
 This works for clones of the same repository and for unrelated
 repositories. Worktrees created with `git worktree add` share one
 repository, so their branches are also plain git refs in each other.
 
-Only committed states can be compared this way. Uncommitted changes are
-covered only by `.`, which refers to the current directory.
+Only committed states of another repository can be compared. `.`
+always refers to the current working directory, which is the only way
+to include uncommitted changes.
+
+packdiff exits with code 2 if a repository flag applies only to refs
+that are not git refs, e.g. `--old-repo` with a `hackage:` or `file:`
+`ref1`, or `--new-repo` with `.` as `ref2`.
 
 ### Package selection
 
@@ -127,6 +139,8 @@ package with `cabal haddock`, and cabal finds the package:
 * Without `--package`, packdiff runs `cabal haddock` without a target in
   the subdirectory of each ref that corresponds to the current directory
   in the working tree, e.g. `core/` when packdiff is run in `core/`.
+  For a ref of another repository, it runs in the root directory of
+  that repository.
   cabal builds the package in that directory. If there is none, e.g. in
   the root of a repository with several packages, cabal prints an error
   and packdiff exits with code 3.
@@ -542,8 +556,8 @@ clone, so it is the fastest mode when `dist-newstyle` is already built.
   the original branch and the git error and exits with code 3.
 * `.` is the same as `HEAD`, because the tree has no uncommitted
   changes.
-* Refs of other repositories (`git:<repo>#<rev>`) still use work
-  clones.
+* Refs of other repositories (`--repo`, `--old-repo`, `--new-repo`)
+  still use work clones.
 
 ### Cleanup on interruption
 
