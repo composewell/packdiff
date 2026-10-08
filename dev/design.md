@@ -44,6 +44,24 @@ A ref has the form `<scope>:<value>`. A ref without a scope is a git ref.
 `hackage` alone is accepted as a shorthand for `hackage:latest`. A git
 tag or branch named `hackage` can be given as `git:hackage`.
 
+### Comparing two local repositories
+
+Git refs are resolved in the repository of the current directory. To
+compare against a branch in another local repository, fetch it into the
+current repository first; it is then an ordinary git ref:
+
+```sh
+git fetch ../streamly-other my-branch:other/my-branch
+packdiff diff other/my-branch HEAD
+```
+
+This works for clones of the same repository and for unrelated
+repositories. Worktrees created with `git worktree add` share one
+repository, so their branches need no fetch.
+
+Only committed states can be compared this way. Uncommitted changes are
+covered only by `.`, which refers to the current directory.
+
 ### Package selection
 
 | Flag | Description |
