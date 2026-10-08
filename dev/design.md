@@ -13,6 +13,38 @@ modules — unexposed modules in `other-modules` are excluded by design.
 
 ---
 
+## Requirements
+
+packdiff runs external programs, found in `PATH`. Which ones are needed
+depends on the refs. This section also belongs in the user
+documentation.
+
+| Program | Needed for |
+|---------|------------|
+| `git` | Git refs: `<rev>`, `git:<rev>`, `git:<repo>#<rev>`. Any version. |
+| `cabal` (cabal-install) | Every ref that is built: git refs, `.`, and Hackage releases whose hoogle file is not downloaded. |
+| `ghc` | Same as `cabal`. Selected with `-w`; otherwise the `ghc` in `PATH`. |
+| `haddock` | Same as `cabal`. cabal uses the `haddock` that matches the selected `ghc`. |
+
+Network access is needed for:
+
+* `hackage:` refs: resolving `hackage:latest` and downloading hoogle
+  files. packdiff makes these HTTPS requests itself; no `curl` or `wget`
+  is needed. (The HTTP client library is to be decided.)
+* `hackage:` refs that are built locally: `cabal get` downloads the
+  source, and requires the package index to be present (`cabal update`).
+* `git:<url>#<rev>` refs: `git ls-remote` and `git fetch`.
+* Building any ref whose dependencies are not yet in the cabal store.
+
+`file:` refs need none of these. `diff file:a.txt file:b.txt` runs
+without git, cabal, ghc or network access.
+
+packdiff checks for the programs needed by the given refs before doing
+any work. If one is missing, it prints the program name and the ref
+that needs it, and exits with code 2.
+
+---
+
 ## Commands
 
 There are three commands. Everything else is flags.
@@ -442,13 +474,39 @@ clone, so it is the fastest mode when `dist-newstyle` is already built.
   Untracked files are left in place and are part of every build.
 * packdiff prints the current branch (or the SHA, if `HEAD` is
   detached) before the first checkout, and checks it out again when the
-  run ends, including on an exception or `SIGINT`. If packdiff is
-  killed with `SIGKILL`, the tree stays on the last revision built, and
-  the printed branch tells the user what to check out.
+  run ends, including on an exception, `SIGINT` (Ctrl-C), `SIGTERM` or
+  `SIGHUP`. If packdiff is killed with `SIGKILL`, the tree stays on the
+  last revision built, and the printed branch tells the user what to
+  check out.
+* The restore uses a plain `git checkout`, never `--force`. If it
+  fails, e.g. because a build modified a tracked file, packdiff prints
+  the original branch and the git error and exits with code 3.
 * `.` is the same as `HEAD`, because the tree has no uncommitted
   changes.
 * Refs of other repositories (`git:<repo>#<rev>`) still use work
   clones.
+
+### Cleanup on interruption
+
+Cleanup means restoring the original branch in in-place mode and
+deleting the work clones otherwise. It runs on normal exit, on an
+exception and on the signals below.
+
+* `SIGINT`: the GHC runtime delivers the first `SIGINT` as a
+  `UserInterrupt` exception to the main thread. The checkouts and
+  builds run inside `bracket`/`finally`, so the cleanup runs.
+* `SIGTERM` and `SIGHUP`: the GHC runtime does not turn these into
+  exceptions; by default the process exits without running any
+  cleanup. CI cancellations send `SIGTERM` and closing the terminal
+  sends `SIGHUP`. packdiff installs handlers for both that throw an
+  exception to the main thread.
+* The cleanup runs under `uninterruptibleMask_`, so a second Ctrl-C
+  during the cleanup does not abort it halfway.
+* Ctrl-C sends `SIGINT` to the whole process group, so a running `git`
+  or `cabal` also receives it. packdiff waits for the child process to
+  exit before cleaning up. Otherwise the restore can fail on a
+  `.git/index.lock` that an interrupted `git checkout` has not yet
+  removed.
 
 ### Effect on the user's repository
 
