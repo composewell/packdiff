@@ -2,7 +2,7 @@
   description = "Packdiff Development Environment";
 
   inputs = {
-    basepkgs.url = "git+ssh://git@github.com/composewell/streamly-packages?rev=76420910d9c74e5fc1d92d680499c97e4f94e873";
+    basepkgs.url = "git+ssh://git@github.com/composewell/streamly-packages?rev=69728978adc44f53b3dd907acb2eb5bd2415fd60";
     nixpkgs.follows = "basepkgs/nixpkgs";
     nixpkgs-darwin.follows = "basepkgs/nixpkgs-darwin";
   };
