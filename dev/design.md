@@ -15,55 +15,133 @@ modules — unexposed modules in `other-modules` are excluded by design.
 
 ## Commands
 
-There are two commands. Everything else is flags.
+There are three commands. Everything else is flags.
 
-### `packdiff diff <ref1> <ref2>`
+| Command | Description |
+|---------|-------------|
+| `packdiff diff [<ref1> [<ref2>]]` | Print the API diff between two refs. |
+| `packdiff check [<ref1> [<ref2>]]` | Print the version bump required by the diff. |
+| `packdiff api [<ref>]` | Print the API of a single ref. |
 
-The primary command. Compares two refs and prints the API diff. This
-output also serves as the API changelog — there is no separate log
-command.
+In `diff` and `check`, `ref1` is the old version and `ref2` is the new
+version. If `ref2` is omitted it defaults to `.`. If both are omitted,
+`ref1` defaults to `HEAD` and `ref2` to `.`. In `api`, `ref` defaults to
+`.`.
 
-A ref is one of:
+### Refs
 
-- A git commit SHA or tag (e.g. `v1.2.0`, `abc1234`)
-- `hackage:<version>` — a specific published Hackage release
-- `hackage` — the latest published release (no version specified)
-- `.` or omitted — the current working directory, including unstaged changes
+A ref has the form `<scope>:<value>`. A ref without a scope is a git ref.
+
+| Ref | Meaning |
+|-----|---------|
+| `<rev>`, `git:<rev>` | A git commit SHA, tag or branch, e.g. `v1.2.0`, `abc1234`. |
+| `.` | The current working directory, including uncommitted changes. |
+| `hackage:<version>` | A specific published Hackage release. |
+| `hackage:latest` | The latest published Hackage release. |
+| `file:<path>` | A hoogle file on disk, e.g. one written by `packdiff api`. |
+| `installed:<version>` | A package installed in the current GHC environment. (Later.) |
+
+`hackage` alone is accepted as a shorthand for `hackage:latest`. A git
+tag or branch named `hackage` can be given as `git:hackage`.
+
+### Package selection
+
+| Flag | Description |
+|------|-------------|
+| `-p / --package <name>` | Package to compare. Repeatable. Defaults to the package in the current directory. |
+| `--cabal-file <path>` | Explicit path to the .cabal file. Defaults to auto-discovery. |
+
+In a multi-package repository, `--package` selects the package. A
+Hackage ref uses the package name to locate the release.
+
+When `--package` is given more than once, the APIs of all the listed
+packages are merged into one API before diffing. This compares a
+package against its successor after a split, e.g. `streamly-0.8.3`
+against `streamly` + `streamly-core`. To give the two sides different
+package sets, a ref can name its packages explicitly:
+
+```sh
+packdiff diff hackage:streamly-0.8.3 "git:HEAD{streamly,streamly-core}"
+```
+
+(The exact syntax for per-ref package sets is to be decided.)
+
+### `packdiff diff`
+
+Compares two refs and prints the API diff. This output also serves as
+the API changelog — there is no separate log command.
 
 ```sh
 # two git tags
 packdiff diff v1.2.0 v1.3.0
 
-# local HEAD vs a tag
+# a tag vs HEAD
 packdiff diff v1.2.0 HEAD
 
-# working directory vs HEAD (second arg defaults to .)
+# HEAD vs working directory
 packdiff diff HEAD
+packdiff diff
 
-# HEAD vs latest published Hackage release
-packdiff diff HEAD hackage
+# latest published Hackage release vs HEAD
+packdiff diff hackage HEAD
 
 # two Hackage versions
 packdiff diff hackage:1.1.0 hackage:1.2.0
 
-# CI: fail if breaking changes detected
-packdiff diff HEAD hackage --fail-on breaking
+# committed API baseline vs working directory
+packdiff diff file:api/streamly.txt .
+
+# CI: fail if breaking changes are detected
+packdiff diff hackage HEAD --fail-on breaking
 ```
 
-### `packdiff check <ref1> <ref2>`
+### `packdiff check`
 
-Inspects the diff and suggests the appropriate semver bump. Accepts the
-same ref syntax as `diff`.
+Classifies the diff and prints the required version bump according to
+the PVP. The base version is the version in `ref1`'s .cabal file.
+
+PVP versions have the form `A.B.C.D`, where `A.B` is the major version.
+
+| Changes in the diff | Required bump | Example from `1.2.0.0` |
+|---------------------|---------------|------------------------|
+| Any breaking change | `A.B` | `1.3.0.0` |
+| Additions only | `C` | `1.2.1.0` |
+| No API change | `D` | `1.2.0.1` |
+
+The breaking/non-breaking classification is defined in
+[Change Classification](#change-classification).
+
+`check` also compares the required bump against the version declared in
+`ref2`'s .cabal file. If the declared version is lower than the required
+version, `check` exits with code 1.
 
 ```sh
 packdiff check v1.2.0 HEAD
-  -> breaking changes detected: bump major  (2.0.0)
+  -> breaking changes detected: bump major (1.3.0.0)
+  -> declared version 1.2.1.0 is insufficient
 
 packdiff check v1.2.0 HEAD
-  -> new symbols added: bump minor  (1.3.0)
+  -> new symbols added: bump minor (1.2.1.0)
+  -> declared version 1.2.1.0 is sufficient
 
 packdiff check v1.2.0 HEAD
-  -> no API changes detected: bump patch  (1.2.1)
+  -> no API changes detected: bump patch (1.2.0.1)
+```
+
+| Flag | Description |
+|------|-------------|
+| `--scheme <s>` | Versioning scheme: `pvp` (default) or `semver`. |
+
+### `packdiff api`
+
+Prints the API of a single ref, with the released and internal modules
+in separate sections. With `--format hoogle` it writes a hoogle file
+that can be committed to the repository as an API baseline and used
+later as a `file:` ref.
+
+```sh
+packdiff api hackage:1.2.0
+packdiff api . --format hoogle > api/streamly.txt
 ```
 
 ---
@@ -83,6 +161,7 @@ API Annotations
 [O] : Old definition
 [N] : New definition
 [D] : Deprecated
+[U] : Undeprecated
 ---------------------------------
 API diff
 ---------------------------------
@@ -93,14 +172,54 @@ API diff
     [C] toHashMapIO
         [O] toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
         [N] toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+[A] Streamly.Data.Scanl
+[R] Streamly.Data.Unfold.Old
 ```
 
-The module-level annotation reflects the worst change inside it — a
-module containing only additions is annotated `[A]`, not `[C]`. This
-makes module-level filtering meaningful.
+The module-level annotation describes the module itself:
 
-The legend is shown in `text` format only. It is omitted in `markdown`,
-`json`, and `github` output.
+| Sigil | Module |
+|-------|--------|
+| `[A]` | The module is new in `ref2`. |
+| `[R]` | The module exists in `ref1` and not in `ref2`. |
+| `[D]` | The module is deprecated in `ref2` and was not deprecated in `ref1`. |
+| `[C]` | The module exists in both refs and some symbol in it changed. |
+
+Modules matching `--internal-module` are printed in a separate
+"Internal API diff" section after the main diff.
+
+The legend is shown in `text` format only. It is omitted in the other
+formats.
+
+---
+
+## Change Classification
+
+A change is either breaking or non-breaking. This follows the PVP
+rules for a major version bump.
+
+| Change | Breaking |
+|--------|----------|
+| Symbol, type, class or module removed | yes |
+| Symbol removed that was deprecated in `ref1` | yes |
+| Type signature changed | yes |
+| Data type definition changed, including an added constructor or field | yes |
+| Class definition changed, including an added method | yes |
+| Instance removed | yes |
+| Fixity changed | yes |
+| Symbol, type, class, instance or module added | no |
+| Symbol deprecated | no |
+| Symbol undeprecated | no |
+
+packdiff compares definitions textually and cannot decide whether a
+changed signature is source-compatible. Every changed signature is
+classified as breaking. For example, removing the `Ord k` constraint
+from `toHashMapIO` above is compatible for callers but is still
+reported as `[C]` and classified as breaking.
+
+An added orphan instance is breaking under the PVP. The hoogle file
+does not mark instances as orphans, so added instances are classified
+as non-breaking.
 
 ---
 
@@ -110,40 +229,138 @@ The legend is shown in `text` format only. It is omitted in `markdown`,
 
 | Flag | Description |
 |------|-------------|
-| `--format <fmt>` | Output format: `text` (default), `json`, `markdown`, `github`. The `github` format emits GitHub Actions annotations (`::warning` / `::error`). |
-| `--color <mode>` | Color control: `auto` (default), `always`, `never`. |
+| `--format <fmt>` | Output format: `text` (default), `json`, `markdown`, `github`. `api` also accepts `hoogle`. |
+| `--color <mode>` | Color control: `auto` (default), `always`, `never`. `auto` disables color when `NO_COLOR` is set or stdout is not a terminal. |
+| `--group-by <g>` | `module` (default): changes grouped by module. `change`: all additions, then all removals, and so on, for use in a changelog. |
 | `-q / --quiet` | Print a one-line summary only, no symbol detail. |
 | `--modules-only` | Collapse output to module-level entries, no symbol detail. |
+
+The `json` output has a `version` field. The schema is versioned
+independently of packdiff and is documented with the release.
+
+The `github` format emits GitHub Actions annotations (`::warning` /
+`::error`). Hoogle files have no source locations, so the annotations
+are not attached to a file or line.
 
 ### Filtering
 
 | Flag | Description |
 |------|-------------|
-| `--show <types>` | Show only these change types. Repeatable. Values: `added`, `removed`, `changed`, `deprecated`. Mutually exclusive with `--hide`. |
-| `--hide <types>` | Hide these change types. Repeatable. Mutually exclusive with `--show`. |
+| `--show <types>` | Show only these change types. Values: `added`, `removed`, `changed`, `deprecated`. Mutually exclusive with `--hide`. |
+| `--hide <types>` | Hide these change types. Mutually exclusive with `--show`. |
 | `--breaking-only` | Shorthand for `--show removed,changed`. |
-| `--module <M>` | Narrow the diff to a specific module. Repeatable. |
-| `--ignore-module <M>` | Exclude a module entirely. Repeatable. Useful for suppressing known re-export false positives. |
+| `--module <glob>` | Narrow the diff to modules matching the glob. Repeatable. |
+| `--ignore-module <glob>` | Exclude modules matching the glob. Repeatable. Used to suppress known re-export false positives. |
+| `--internal-module <glob>` | Treat matching modules as internal. Repeatable. Default: `*.Internal.*` and `*.Internal`. |
+
+`<types>` is a comma-separated list, and the flag may also be repeated:
+`--show added,removed` is the same as `--show added --show removed`.
 
 ### CI and exit codes
 
 | Flag | Description |
 |------|-------------|
-| `--fail-on <severity>` | Exit 1 if changes at this severity or above are detected. Values: `breaking` (removed or changed), `any`. |
-| `--warn-on removals` | Emit warnings for removals without triggering `--fail-on`. Useful when re-export false positives are possible. |
-| `--cabal-file <path>` | Explicit path to the .cabal file. Defaults to auto-discovery. |
+| `--fail-on <types>` | Exit 1 if the diff contains any change of these types. Takes the same values as `--show`, plus `breaking` (removed and changed) and `any`. |
+
+Filters apply in this order:
+
+1. `--module`, `--ignore-module` and `--internal-module` select the
+   modules that are diffed. Internal modules never count towards
+   `--fail-on`.
+2. `--fail-on` is evaluated on the result.
+3. `--show`, `--hide`, `--breaking-only`, `-q` and `--modules-only`
+   affect only what is printed. They do not change the exit code.
 
 Exit codes:
 
-- `0` — no diff detected
-- `1` — diff detected and matches `--fail-on` threshold
-- `2` — usage or configuration error
+| Code | Meaning |
+|------|---------|
+| `0` | Success, and no change reached the `--fail-on` threshold. Without `--fail-on`, always 0 on success. |
+| `1` | The `--fail-on` threshold was reached, or `check` found the declared version insufficient. |
+| `2` | Usage or configuration error. |
+| `3` | Failure to obtain an API: git, build, haddock, network or hoogle file parse error. |
+
+Haskell programs exit with 1 on an uncaught exception, so all
+exceptions must be caught at the top level and mapped to 2 or 3.
+
+### Build options
+
+| Flag | Description |
+|------|-------------|
+| `--project-file <path>` | cabal project file used to build each ref. |
+| `-w / --with-compiler <ghc>` | Compiler used to build each ref. |
+| `--cabal-option <opt>` | Extra option passed to `cabal haddock`. Repeatable. |
+| `--no-hackage-download` | Build Hackage releases locally instead of downloading their hoogle files. |
+| `--no-cache` | Do not read or write the hoogle file cache. |
+
+---
+
+## Configuration File
+
+`packdiff.yaml` in the repository root holds defaults for the flags, so
+that local and CI runs use the same settings:
+
+```yaml
+packages: [streamly, streamly-core]
+scheme: pvp
+ignore-modules:
+  - Streamly.Prelude
+internal-modules:
+  - "*.Internal.*"
+fail-on: breaking
+```
+
+Command-line flags override the configuration file.
+
+---
+
+## Implementation
+
+### Pipeline
+
+1. **Resolve** each ref to a source: a git revision, the working
+   directory, a Hackage release, or a hoogle file.
+2. **Obtain** the hoogle file for each package of the ref.
+3. **Parse** each hoogle file into an API (`HoogleFileParser`).
+4. **Merge** the APIs of multiple packages into one API
+   (`mergeNonConflictingAPI`).
+5. **Diff** the two APIs (`Diff`).
+6. **Classify** each change as breaking or non-breaking.
+7. **Filter** modules and evaluate `--fail-on`.
+8. **Render** in the selected format (`Pretty`).
+
+### Obtaining a hoogle file
+
+| Source | Method |
+|--------|--------|
+| git revision | `git worktree add` into a temporary directory, then `cabal haddock --haddock-hoogle` with a separate `--builddir` per ref. |
+| `.` | `cabal haddock --haddock-hoogle` in the working directory. |
+| Hackage | Download `https://hackage.haskell.org/package/<pkg>-<ver>/docs/<pkg>.txt`. If Hackage has no docs for the release, fall back to `cabal get <pkg>-<ver>` and a local haddock build. |
+| `file:` | Read the file. |
+
+packdiff never runs `git checkout` in the user's working tree, so
+uncommitted changes are never touched and `.` can be diffed against any
+revision.
+
+### Cache
+
+Hoogle files are cached under the XDG cache directory, keyed by
+(package, commit SHA or Hackage version, GHC version, haddock version).
+Downloaded Hackage files are keyed by (package, version). The `.` ref
+is not cached.
+
+### Testing
+
+Golden tests run the parse, diff, classify and render stages on pairs
+of small hoogle files checked into the test suite. These tests need no
+cabal builds or network access.
 
 ---
 
 ## Known Limitations
 
-packdiff uses the hoogle file produced by haddock. Two limitations follow from this.
+packdiff uses the hoogle file produced by haddock. Three limitations
+follow from this.
 
 ### 1. Unexposed modules are excluded
 
@@ -156,20 +373,38 @@ When a module re-exports symbols from another module, packdiff cannot
 merge the two and may report a removal that does not exist. In practice
 this is manageable with human review in the loop.
 
-Mitigation: use `--ignore-module <M>` to suppress known false-positive
-modules from CI output, and `--warn-on removals` to flag removals as
-warnings rather than hard failures until reviewed.
+Mitigation: use `--ignore-module <glob>` to suppress known
+false-positive modules from CI output.
 
-## More things to do
+A possible fix is to read haddock's `.haddock` interface files
+(`haddock --show-interface`) instead of the hoogle file. Interface
+files record the export list of each module, which allows re-exports to
+be resolved.
 
-Additionally we should be able to:
-* specify a hoogle file instead of a package for the diff
-* specify an installed package for the diff
-* show the API summary for any rev, hackage version
-* show API summary for an installed package in the current ghc environment
-* show the doc of an api "package:module:definition".
-* show reverse deps of a package and which version are they using, show
-  maintainer email -- send mails about how to migrate.
+### 3. Different GHC or haddock versions render signatures differently
 
-We can use a scope specifier to specify the source type e.g. hackage:, git:,
-github:, installed:, file: etc.
+Hoogle files generated by different GHC or haddock versions differ
+textually for the same API: `forall` placement, `Type` vs `*`, operator
+sections and instance ordering. A diff between such files reports
+false `[C]` entries. This affects comparisons between a hoogle file
+downloaded from Hackage and one built locally.
+
+Mitigations: build both refs with the same compiler (`-w`), use
+`--no-hackage-download` to build Hackage releases locally, and
+normalise signatures before comparing.
+
+---
+
+## Future Work
+
+* `installed:` refs: diff a package installed in the current GHC
+  environment.
+* Show the documentation of a single entity, `package:module:name`.
+
+### Out of scope
+
+* Reverse dependencies: list the packages that depend on a package,
+  the versions they use, and their maintainers, and draft migration
+  notes. This needs a separate data source (the Hackage reverse
+  dependency index) and belongs in a separate tool. Emails, if any,
+  should be generated as drafts, not sent.
