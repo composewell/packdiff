@@ -315,6 +315,13 @@ Internal modules:
 Below a `[~]` entity, a line starting with `-` is the definition in
 `ref1` and a line starting with `+` is the definition in `ref2`.
 
+`+`, `-` and `~` are the usual symbols for added, removed and changed,
+e.g. in `diff` and in Terraform plans. A removed entity is shown by its
+`ref1` definition and an added one by its `ref2` definition, the same
+as the `-` and `+` lines. Deprecation is a change of status, not of
+structure, so it keeps a letter; with removal written as `[-]`, `[D]`
+cannot be read as "deleted".
+
 ### Entities
 
 | Entity | Line |
