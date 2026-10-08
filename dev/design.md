@@ -299,7 +299,7 @@ Internal modules:
 [~] Streamly.Internal.Data.Fold
     [+] foldtM' :: Monad m => (s -> a -> m (Step s b)) -> m (Step s b) -> (s -> m b) -> Fold m a b
 
-5 modules: 1 added, 1 removed, 2 changed, 1 deprecated; symbols: 3 added, 3 changed, 1 deprecated; 4 breaking; internal modules: 1 changed
+5 modules: 1 added [+], 1 removed [-], 2 changed [~], 1 deprecated [D]; symbols: 3 added [+], 3 changed [~], 1 deprecated [D]; 4 breaking; internal modules: 1 changed [~]
 ```
 
 ### Sigils
@@ -371,7 +371,9 @@ modules, under the line `Internal modules:`, in the same format.
 The last line summarises the diff. It counts modules by sigil, the
 entity lines of changed modules by sigil, the breaking changes (see
 [Change Classification](#change-classification)), and the internal
-modules by sigil. Counts that are zero are omitted. An empty diff
+modules by sigil. Each count is followed by its sigil, so the summary
+also explains the sigils used in the output. Counts that are zero are
+omitted. An empty diff
 prints `No API changes.`
 
 `-q` prints only the summary line. `--modules-only` prints the module
@@ -403,8 +405,9 @@ Scripts can rely on the following:
   or `+`.
 * The summary is the last line.
 
-For example, `grep -F '[-]'` lists every removal; the brackets
-need `-F` or escaping (`grep '\[-\]'`). An entity line does
+For example, `grep '^ *\[-\]'` lists every removal; the pattern is
+anchored to the start of the line because the summary line also
+contains sigils. An entity line does
 not contain its module name in the default grouping, so attributing a
 line to its module requires the preceding module line.
 
