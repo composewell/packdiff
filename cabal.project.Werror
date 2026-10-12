@@ -1,4 +1,4 @@
-packages: .
+import: cabal.project
 
 package packdiff
   ghc-options: -Werror

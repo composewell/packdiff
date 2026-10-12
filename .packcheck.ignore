@@ -4,3 +4,5 @@
 cabal.project.Werror
 flake.lock
 flake.nix
+cabal.project
+sources.nix

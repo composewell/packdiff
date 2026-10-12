@@ -1,0 +1,34 @@
+[~] Test.Fold
+    [~] newtype Fold (m :: Type -> Type) a b
+        - newtype Fold m a b
+        + newtype Fold (m :: Type -> Type) a b
+        [D] [foldStep] :: Fold m a b -> s -> a -> m (Step s b)
+    [~] data Step s b
+        [+] Partial :: !s -> Step s b
+    [~] class IsMap (f :: Type -> Type) where { type Key (f :: Type -> Type); }
+        [+] mapDelete :: IsMap f => Key f -> f a -> f a
+    [+] instance Monad m => Applicative (Fold m a)
+    [-] instance Show (Step s b)
+    [-] removedFn :: Int -> Int
+    [~] toHashMapIO
+        - toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+        + toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+    [U] toListOld :: Fold m a [a]
+    [~] <>
+        - infixr 6 <>
+        + infixr 5 <>
+[~] Test.Prelude
+    [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
+    [+] useAcquire :: AcquireIO -> Config -> Config
+[+] Test.Scanl (2 symbols)
+[D] Test.ToBeDeprecated
+[-] Test.Unfold.Old (2 symbols)
+
+Internal modules:
+[~] Test.Internal.Fold
+    [+] foldtM' :: Int
+
+Modules: 1 added [+], 1 removed [-], 2 changed [~], 1 deprecated [D]
+Symbols: 4 added [+], 2 removed [-], 5 changed [~], 2 deprecated [D], 1 undeprecated [U]
+Internal modules: 1 changed [~]
+Breaking changes: 8

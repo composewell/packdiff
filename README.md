@@ -1,53 +1,145 @@
 # packdiff
 
-**Usage:**
+packdiff tells you what changed in the public API of a Haskell package
+between two versions, and which version bump the
+[PVP](https://pvp.haskell.org/) requires for those changes.
+
+* `packdiff diff` lists the API changes module by module: added, removed,
+  changed, deprecated and undeprecated symbols, with the old and new
+  definition of each changed symbol. The summary at the end gives the
+  number of breaking changes.
+* During development, `packdiff diff` with no arguments compares `HEAD`
+  with your working tree, so you can see what your uncommitted edits do to
+  the API before you commit.
+* In CI, run `packdiff diff` on each pull request against the base
+  branch or the latest Hackage release. The build log then shows what the
+  PR changes in the API, and `--fail-on breaking` fails the build if any
+  change is breaking.
+* `packdiff check` tells you whether a release needs a major, minor or
+  patch bump, and why. For example: `breaking changes between v1.2.0
+  (1.2.0.0) and . (1.2.0.0): bump major (1.3.0.0)`.
+* `packdiff check` returns exit code 1 if the version in the cabal file is
+  lower than required. You can use it to report the problem or to fail the
+  CI build automatically.
+
+The two versions can be git commits, the working tree, Hackage releases
+or saved hoogle files. packdiff builds the hoogle file of each version
+with `cabal haddock` and compares them. Only exposed modules are compared.
+You don't need to change your package to use it.
+
+## Usage
 
 ```
-packdiff diff <package-name> <rev1> <package-name> <rev2>
+packdiff diff  [REF1 [REF2]]   # API diff between two refs
+packdiff check [REF1 [REF2]]   # PVP version bump required by the diff
+packdiff api   [REF]           # API of one ref
 ```
 
-## API Diff Output
+In `diff` and `check`, `REF1` is the old version and `REF2` the new one.
+`REF2` defaults to `.`; with no refs, `REF1` is `HEAD` and `REF2` is `.`.
+The ref of `api` defaults to `.`.
+
+| Ref | Meaning |
+|-----|---------|
+| `<rev>`, `git:<rev>` | A git commit, tag or branch. |
+| `.` | The working directory, including uncommitted changes. |
+| `hackage:<version>` | A published Hackage release. |
+| `hackage`, `hackage:latest` | The latest Hackage release. |
+| `file:<path>` | A hoogle file, e.g. one written by `packdiff api --format hoogle`. |
+
+Examples:
+
+```sh
+packdiff diff v1.2.0 HEAD
+packdiff diff                       # HEAD vs the working directory
+packdiff diff hackage HEAD --fail-on breaking
+packdiff diff -p streamly hackage:0.9.0 hackage:0.10.0
+packdiff diff --repo https://github.com/composewell/streamly v0.9.0 v0.10.0
+packdiff check v1.2.0 HEAD
+packdiff api . --format hoogle > api/streamly.txt
+packdiff diff file:api/streamly.txt .
+```
+
+In a repository with several packages, select the package with
+`-p/--package`. `packdiff --help` and `packdiff <command> --help` list all
+options.
+
+## Output
 
 ```
----------------------------------
-API Annotations
----------------------------------
-
-[A] : Added
-[R] : Removed
-[C] : Changed
-[O] : Old definition
-[N] : New definition
-[D] : Deprecated
-
----------------------------------
-API diff
----------------------------------
-
-[C] Streamly.Data.Stream.Prelude
-    [A] useAcquire :: AcquireIO -> Config -> Config
+[~] Streamly.Data.Fold
+    [~] data Step s b
+        [+] Partial :: s -> Step s b
+    [~] toHashMapIO
+        - toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+        + toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+[+] Streamly.Data.Scanl (12 symbols)
+[~] Streamly.Data.Stream.Prelude
+    [+] useAcquire :: AcquireIO -> Config -> Config
     [D] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
-[C] Streamly.Data.Fold.Prelude
-    [C] toHashMapIO
-        [O] toHashMapIO :: (MonadIO m, Hashable k, Ord k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
-        [N] toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+
+Modules: 1 added [+], 2 changed [~]
+Symbols: 2 added [+], 2 changed [~], 1 deprecated [D]
+Breaking changes: 2
 ```
 
-## CI Integration
+| Sigil | Meaning |
+|-------|---------|
+| `[+]` | Added in `REF2`. |
+| `[-]` | Present in `REF1`, removed in `REF2`. |
+| `[~]` | Definition changed. The `-` line is the `REF1` definition, the `+` line the `REF2` definition. |
+| `[D]` | Deprecated in `REF2`, not deprecated in `REF1`. |
+| `[U]` | Deprecated in `REF1`, not deprecated in `REF2`. |
 
-For CI integration check out packdiff github CI in the streamly repo:
-https://github.com/composewell/streamly.
+Added and removed modules show only their symbol count. `--expand` also
+lists their symbols. `--collapse` prints only the module lines, and `-q`
+only the summary.
+
+Modules matching `--internal-module` (default `*.Internal.*` and
+`*.Internal`) are listed separately under `Internal modules:` and do not
+count towards `--fail-on`, `check` or the breaking change count.
+
+## Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success. |
+| 1 | The `--fail-on` threshold was reached, or `check` found the declared version insufficient. |
+| 2 | Usage error, including a missing external program. |
+| 3 | Failure to obtain an API: a failed `git` or `cabal` command, a build failure or a hoogle file parse error. |
+
+## Requirements
+
+packdiff runs the following programs, found in `PATH`:
+
+| Program | Needed for |
+|---------|------------|
+| `git` | Git refs. |
+| `cabal` | Every ref except `file:`. |
+| `ghc` | Every ref except `file:`. Selected with `-w`. |
+| `haddock` | Every ref except `file:`. |
+
+Network access is needed for `hackage:` refs (`cabal get`), for git refs
+of a remote repository, and for building a ref whose dependencies are not
+in the cabal store. Hackage versions are resolved from cabal's local
+package index; run `cabal update` if a recent release is not found.
+
+Git refs are built in temporary clones under
+`$XDG_CACHE_HOME/packdiff/work`, so the working tree is never touched
+unless `--in-place` is given. Hoogle files of git and Hackage refs are
+cached in `$XDG_CACHE_HOME/packdiff/hoogle`; `--no-cache` disables the
+cache.
 
 ## Limitations
 
-Packdiff uses the hoogle file created by haddock to generate and compare the
-difference between multiple versions of a package
+1. Modules in `other-modules` are not compared.
+2. A symbol re-exported from another module may be reported as removed.
+   Use `--ignore-module` to suppress known cases.
+3. Different GHC or haddock versions render signatures differently, which
+   shows as false `[~]` changes. Build both refs with the same compiler,
+   and do not compare `file:` refs made with different compilers.
+4. Class methods are not marked in hoogle files. A function that directly
+   follows a class and has the class as its first constraint is taken to
+   be a method of that class.
 
-1. The API for modules in the `other-modules` sections is not generated or
-   compared.
-2. The re-exported module is just considered a re-exported module. The API of
-   the re-exported module isn't merged with the module that re-exports it.
-
-The 2nd limitation might end up falsely reporting a diff even if the diff does
-not exist. In our use-case where we have manual intervention this isn't a
-problem and does the job well.
+See [dev/design.md](dev/design.md) for the design.

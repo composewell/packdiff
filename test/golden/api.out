@@ -1,0 +1,37 @@
+[+] Test.Fold
+    [+] newtype Fold (m :: Type -> Type) a b
+        [+] Fold :: (s -> a -> m (Step s b)) -> Fold m a b
+        [+] [foldStep] :: Fold m a b -> s -> a -> m (Step s b)
+    [+] data Step s b
+        [+] Partial :: !s -> Step s b
+        [+] Done :: !b -> Step s b
+    [+] type Config = Int
+    [+] class IsMap (f :: Type -> Type) where { type Key (f :: Type -> Type); }
+        [+] mapEmpty :: IsMap f => f a
+        [+] mapInsert :: IsMap f => Key f -> a -> f a -> f a
+        [+] mapDelete :: IsMap f => Key f -> f a -> f a
+    [+] class Monad m => MonadAsync m
+    [+] instance Monad m => Applicative (Fold m a)
+    [+] instance Monad m => Functor (Fold m a)
+    [+] pattern Partial :: s -> Step s b
+    [+] (<>) :: Fold m a b -> Fold m a b -> Fold m a b
+    [+] sum :: (Monad m, Num a) => Fold m a a
+    [+] toHashMapIO :: (MonadIO m, Hashable k) => (a -> k) -> Fold m a b -> Fold m a (HashMap k b)
+    [+] toListOld :: Fold m a [a]
+    [+] infixr 5 <>
+[+] Test.Prelude
+    [+] config :: Config
+    [+] parEval :: MonadAsync m => (Config -> Config) -> Stream m a -> Stream m a
+    [+] useAcquire :: AcquireIO -> Config -> Config
+[+] Test.Scanl
+    [+] data Scanl m a b
+    [+] scanl :: Fold m a b -> Scanl m a b
+[+] Test.Stable
+    [+] stable :: Int
+[+] Test.ToBeDeprecated
+    [+] dep :: Int
+
+Internal modules:
+[+] Test.Internal.Fold
+    [+] foldtM :: Int
+    [+] foldtM' :: Int
