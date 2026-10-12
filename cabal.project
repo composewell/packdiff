@@ -1,0 +1,14 @@
+packages: .
+
+-- XXX streamly-coreutils is not on Hackage yet. Remove this when it is
+-- released (see dev/upstream-fixes.md).
+source-repository-package
+  type: git
+  location: https://github.com/composewell/streamly-coreutils
+  tag: 9daf64da9868c8e6bed11d51bcff45bf6e0b0a93
+
+tests: True
+
+-- Limit the heap used by GHC when compiling.
+program-options
+  ghc-options: +RTS -M1500m -RTS

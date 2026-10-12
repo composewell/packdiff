@@ -1,0 +1,18 @@
+[~] Test.Fold
+    [~] data Step s b
+        [+] Partial :: !s -> Step s b
+    [~] class IsMap (f :: Type -> Type) where { type Key (f :: Type -> Type); }
+        [+] mapDelete :: IsMap f => Key f -> f a -> f a
+    [+] instance Monad m => Applicative (Fold m a)
+[~] Test.Prelude
+    [+] useAcquire :: AcquireIO -> Config -> Config
+[+] Test.Scanl (2 symbols)
+
+Internal modules:
+[~] Test.Internal.Fold
+    [+] foldtM' :: Int
+
+Modules: 1 added [+], 1 removed [-], 2 changed [~], 1 deprecated [D]
+Symbols: 4 added [+], 2 removed [-], 5 changed [~], 2 deprecated [D], 1 undeprecated [U]
+Internal modules: 1 changed [~]
+Breaking changes: 8
