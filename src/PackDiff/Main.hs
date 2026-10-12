@@ -214,6 +214,8 @@ diffCommand :: Env -> Options -> RefArg -> RefArg -> IO ExitCode
 diffCommand env opts a1 a2 = do
     visible <- visibility opts
     color <- useColor (optColor opts)
+    hPutStrLn stderr $
+        "packdiff: comparing " ++ raString a1 ++ " with " ++ raString a2
     (o1, o2) <- obtainPair env opts a1 a2
     let (released, internal) = diffPair opts o1 o2
         ro = RenderOptions
@@ -240,6 +242,9 @@ versionOf a ob =
 
 checkCommand :: Env -> Options -> RefArg -> RefArg -> IO ExitCode
 checkCommand env opts a1 a2 = do
+    hPutStrLn stderr $
+        "packdiff: checking the version of " ++ raString a2
+            ++ " against " ++ raString a1
     (o1, o2) <- obtainPair env opts a1 a2
     base <- versionOf a1 o1
     declared <- versionOf a2 o2
@@ -248,18 +253,22 @@ checkCommand env opts a1 a2 = do
         bump = requiredBump mds
         required = bumpVersion bump base
         sufficient = compareVersion declared required /= LT
-        reason =
+        label a v = raString a ++ " (" ++ showVersion v ++ ")"
+        (changes, bumpName) =
             case bump of
-                BumpMajor -> "breaking changes detected: bump major"
+                BumpMajor -> ("breaking changes", "major")
                 BumpMinor
                     | hasChangeIn (Set.singleton Added) mds ->
-                        "new symbols added: bump minor"
-                    | otherwise -> "non-breaking changes detected: bump minor"
-                BumpPatch -> "no API changes detected: bump patch"
-    putStrLn $ reason ++ " (" ++ showVersion required ++ ")"
+                        ("new symbols added", "minor")
+                    | otherwise -> ("non-breaking changes", "minor")
+                BumpPatch -> ("no API changes", "patch")
     putStrLn $
-        "declared version " ++ showVersion declared ++ " is "
-            ++ if sufficient then "sufficient" else "insufficient"
+        changes ++ " between " ++ label a1 base ++ " and "
+            ++ label a2 declared ++ ": bump " ++ bumpName ++ " ("
+            ++ showVersion required ++ ")"
+    putStrLn $
+        "declared version " ++ showVersion declared ++ " of " ++ raString a2
+            ++ " is " ++ if sufficient then "sufficient" else "insufficient"
     pure (if sufficient then ExitSuccess else ExitFailure 1)
 
 apiCommand :: Env -> Options -> RefArg -> IO ExitCode
