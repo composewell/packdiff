@@ -180,8 +180,8 @@ diffSpec = describe "Diff" $ do
         breakingCount (Map.elems rel) `shouldBe` 8
 
     it "does not count a child deprecation as breaking" $ do
-        let child c d = Child c c d
-            decl cs = Decl KData "T" "data T" [] False cs
+        let child c = Child c c
+            decl = Decl KData "T" "data T" [] False
             dd = DeclDiff Changed (Just (decl [child "A" False]))
                     (Just (decl [child "A" True]))
                     [ChildDiff Deprecated (Just (child "A" False)) (Just (child "A" True))]

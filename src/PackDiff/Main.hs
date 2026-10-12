@@ -25,6 +25,7 @@ import Control.Exception
     , uninterruptibleMask_
     )
 import Data.Function ((&))
+import Data.Maybe (isNothing)
 import System.Console.ANSI (hSupportsANSI)
 import System.Environment (lookupEnv)
 import System.Exit (ExitCode(..), exitWith)
@@ -298,7 +299,7 @@ run opts = do
         let inPlaceRefs =
                 [ a | a <- args
                 , raRef a == RefCwd
-                    || isGitRef (raRef a) && raRepoFlag a == Nothing
+                    || isGitRef (raRef a) && isNothing (raRepoFlag a)
                 ]
         if optInPlace opts && not (null inPlaceRefs)
         then do

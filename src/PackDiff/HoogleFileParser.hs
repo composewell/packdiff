@@ -21,7 +21,7 @@ module PackDiff.HoogleFileParser
 
 import Data.Char (isSpace, isUpper)
 import Data.Function ((&))
-import Data.List (isInfixOf, isPrefixOf, stripPrefix)
+import Data.List (isInfixOf, isPrefixOf, isSuffixOf, stripPrefix)
 import Data.Maybe (isNothing)
 import Streamly.Data.Fold (Fold)
 import Streamly.Data.Stream (Stream)
@@ -244,7 +244,7 @@ topLevel line st1 =
             ("newtype" : _) -> open KData (nameAfterKeyword line)
             ("type" : _) -> insert KTypeSyn (nameAfterKeyword line)
             ("class" : _) ->
-                let multiline = "{" `isSuffixOf'` line
+                let multiline = "{" `isSuffixOf` line
                     cls = className line
                  in st { stOpen = OpenClass cls multiline (mkDecl KClass cls line doc) }
             ("instance" : _) ->
@@ -254,10 +254,6 @@ topLevel line st1 =
                 | fx `elem` ["infix", "infixl", "infixr"] ->
                     insert KFixity (unwords ops)
             _ -> insert KFunction (takeWhile (not . isSpace) line)
-
-    where
-
-    isSuffixOf' s x = reverse s `isPrefixOf` reverse x
 
 -- | A continuation line of a multi line class declaration, e.g. an associated
 -- type. It is appended to the class declaration so that the declaration

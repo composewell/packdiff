@@ -26,6 +26,7 @@ module PackDiff.Git
     , checkout
     ) where
 
+import Control.Monad (void)
 import Data.Char (isHexDigit, isSpace)
 import Data.Maybe (listToMaybe)
 
@@ -35,7 +36,7 @@ import PackDiff.Process
 type Sha = String
 
 git :: FilePath -> [String] -> Cmd
-git dir args = Cmd (Just dir) "git" args
+git dir = Cmd (Just dir) "git"
 
 trim :: String -> String
 trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
@@ -131,15 +132,15 @@ currentBranch repo = do
 -- source repository through @.git/objects/info/alternates@.
 cloneShared :: FilePath -> FilePath -> FilePath -> IO ()
 cloneShared cwd repo dest =
-    () <$ runCmd (git cwd ["clone", "-q", "--shared", "--no-checkout", repo, dest])
+    void $ runCmd (git cwd ["clone", "-q", "--shared", "--no-checkout", repo, dest])
 
 initRepo :: FilePath -> FilePath -> IO ()
-initRepo cwd dest = () <$ runCmd (git cwd ["init", "-q", dest])
+initRepo cwd dest = void $ runCmd (git cwd ["init", "-q", dest])
 
 -- | Fetch only the files of one commit.
 fetchSha :: FilePath -> String -> Sha -> IO ()
 fetchSha repo url sha =
-    () <$ runCmd (git repo ["fetch", "-q", "--depth", "1", url, sha])
+    void $ runCmd (git repo ["fetch", "-q", "--depth", "1", url, sha])
 
 checkout :: FilePath -> String -> IO ()
-checkout repo rev = () <$ runCmd (git repo ["checkout", "-q", rev])
+checkout repo rev = void $ runCmd (git repo ["checkout", "-q", rev])

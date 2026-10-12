@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 -- |
 -- Module      : PackDiff.Options
 -- Copyright   : (c) 2022 Composewell Technologies
@@ -166,19 +167,17 @@ data OutputOpts =
         (Maybe (Set Change)) (Maybe (Set Change)) Bool
 
 colorReader :: ReadM ColorMode
-colorReader = eitherReader $ \s ->
-    case s of
-        "auto" -> Right ColorAuto
-        "always" -> Right ColorAlways
-        "never" -> Right ColorNever
-        _ -> Left "expected auto, always or never"
+colorReader = eitherReader $ \case
+    "auto" -> Right ColorAuto
+    "always" -> Right ColorAlways
+    "never" -> Right ColorNever
+    _ -> Left "expected auto, always or never"
 
 groupByReader :: ReadM GroupBy
-groupByReader = eitherReader $ \s ->
-    case s of
-        "module" -> Right GroupByModule
-        "change" -> Right GroupByChange
-        _ -> Left "expected module or change"
+groupByReader = eitherReader $ \case
+    "module" -> Right GroupByModule
+    "change" -> Right GroupByChange
+    _ -> Left "expected module or change"
 
 colorOpt :: Parser ColorMode
 colorOpt =
@@ -221,11 +220,10 @@ formatOpt =
 
     where
 
-    reader = eitherReader $ \s ->
-        case s of
-            "text" -> Right FormatText
-            "hoogle" -> Right FormatHoogle
-            _ -> Left "expected text or hoogle"
+    reader = eitherReader $ \case
+        "text" -> Right FormatText
+        "hoogle" -> Right FormatHoogle
+        _ -> Left "expected text or hoogle"
 
 refsArg :: String -> Parser [String]
 refsArg meta = many (strArgument (metavar meta))

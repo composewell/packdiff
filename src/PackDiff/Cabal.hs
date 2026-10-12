@@ -100,7 +100,7 @@ trim = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 -- hoogle file, so its human readable output is used.
 hoogleFileFromOutput :: String -> Maybe FilePath
 hoogleFileFromOutput out =
-    case filter (".txt" `isSuffixOf`) (concatMap candidates (lines out)) of
+    case concatMap (filter (".txt" `isSuffixOf`) . candidates) (lines out) of
         [] -> Nothing
         xs -> Just (last xs)
 

@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 -- |
 -- Module      : PackDiff.Obtain
 -- Copyright   : (c) 2022 Composewell Technologies
@@ -33,6 +34,7 @@ import Control.Monad (unless, when)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef')
 import Data.List (nub)
 import Data.Map (Map)
+import Data.Maybe (isJust)
 import System.Directory (doesDirectoryExist, doesFileExist, makeAbsolute)
 import System.IO (hPutStrLn, stderr)
 
@@ -65,7 +67,7 @@ requiredPrograms bc inPlace = nub . concatMap needs
 
     build = ["cabal", compilerProgram bc, haddockProgram bc]
     needs (s, ref) =
-        map (\p -> (p, s)) $
+        map (, s) $
             case ref of
                 RefGit _ -> "git" : build
                 RefCwd -> [ "git" | inPlace ] ++ build
@@ -76,7 +78,7 @@ requiredPrograms bc inPlace = nub . concatMap needs
 programExists :: String -> IO Bool
 programExists p
     | any (`elem` "/\\") p = doesFileExist p
-    | otherwise = fmap (maybe False (const True)) (Which.which p)
+    | otherwise = fmap isJust (Which.which p)
 
 -- | Exit with a usage error if a program needed by a ref is missing.
 checkPrograms :: [(String, String)] -> IO ()
