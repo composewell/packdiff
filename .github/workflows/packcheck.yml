@@ -157,16 +157,16 @@ jobs:
             command: cabal
             ghc_version: 9.12.4
             # WARNING! cannot use # comments inside pack_options.
-            #pack_options: >-
-            #  CABAL_PROJECT=cabal.project
+            pack_options: >-
+              CABAL_PROJECT=cabal.project
 
           - name: ci
             runner: ubuntu-latest
             command: cabal
             ghc_version: 9.10.3
             # WARNING! cannot use # comments inside pack_options.
-            #pack_options: >-
-            #  CABAL_PROJECT=cabal.project
+            pack_options: >-
+              CABAL_PROJECT=cabal.project
 
           #- name: ghc-9.10.3
           #  runner: ubuntu-latest
@@ -182,24 +182,24 @@ jobs:
             command: cabal
             ghc_version: 9.8.4
             # WARNING! cannot use # comments inside pack_options.
-            #pack_options: >-
-            #  CABAL_PROJECT=cabal.project
+            pack_options: >-
+              CABAL_PROJECT=cabal.project
 
           - name: ci
             runner: ubuntu-latest
             command: cabal
             ghc_version: 9.6.3
             # WARNING! cannot use # comments inside pack_options.
-            #pack_options: >-
-            #  CABAL_PROJECT=cabal.project
+            pack_options: >-
+              CABAL_PROJECT=cabal.project
 
           - name: ci
             runner: windows-latest
             command: cabal
             ghc_version: 9.12.4
             # WARNING! cannot use # comments inside pack_options.
-            #pack_options: >-
-            #  CABAL_PROJECT=cabal.project
+            pack_options: >-
+              CABAL_PROJECT=cabal.project
 
           - name: ci
             runner: ubuntu-latest
@@ -208,7 +208,7 @@ jobs:
             pack_options: >-
               HLINT_VERSION=3.6.1
               HLINT_OPTIONS="lint"
-              HLINT_TARGETS="src"
+              HLINT_TARGETS="src cli test"
 
           #- name: docspec
           #  runner: ubuntu-latest
