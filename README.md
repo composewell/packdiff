@@ -69,6 +69,10 @@ Breaking changes: 2
 | `[D]` | Deprecated in `REF2`, not deprecated in `REF1`. |
 | `[U]` | Deprecated in `REF1`, not deprecated in `REF2`. |
 
+Added and removed modules show only their symbol count. `--expand` also
+lists their symbols. `--collapse` prints only the module lines, and `-q`
+only the summary.
+
 Modules matching `--internal-module` (default `*.Internal.*` and
 `*.Internal`) are listed separately under `Internal modules:` and do not
 count towards `--fail-on`, `check` or the breaking change count.

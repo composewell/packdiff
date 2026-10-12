@@ -24,6 +24,7 @@ import Control.Exception
     , throwIO
     , uninterruptibleMask_
     )
+import Control.Monad (when)
 import Data.Function ((&))
 import Data.Maybe (isNothing)
 import System.Console.ANSI (hSupportsANSI)
@@ -197,6 +198,19 @@ visibility opts =
             (s, False) -> s
             (s, True) -> Just (maybe breaking (Set.union breaking) s)
 
+renderOptions :: Options -> IO RenderOptions
+renderOptions opts = do
+    visible <- visibility opts
+    when (optCollapse opts && optExpand opts) $
+        usageError "--collapse and --expand cannot be used together"
+    pure RenderOptions
+        { roGroupBy = optGroupBy opts
+        , roQuiet = optQuiet opts
+        , roCollapse = optCollapse opts
+        , roExpand = optExpand opts
+        , roVisible = visible
+        }
+
 selectedAPI :: Options -> Obtained -> API
 selectedAPI opts = selectModules (moduleFilter opts) . hoogleAPI . obHoogle
 
@@ -212,18 +226,12 @@ diffPair opts o1 o2 =
 
 diffCommand :: Env -> Options -> RefArg -> RefArg -> IO ExitCode
 diffCommand env opts a1 a2 = do
-    visible <- visibility opts
+    ro <- renderOptions opts
     color <- useColor (optColor opts)
     hPutStrLn stderr $
         "packdiff: comparing " ++ raString a1 ++ " with " ++ raString a2
     (o1, o2) <- obtainPair env opts a1 a2
     let (released, internal) = diffPair opts o1 o2
-        ro = RenderOptions
-                { roGroupBy = optGroupBy opts
-                , roQuiet = optQuiet opts
-                , roModulesOnly = optModulesOnly opts
-                , roVisible = visible
-                }
     putStr $ renderLines color (renderDiff ro released internal)
     pure $ case optFailOn opts of
         Just cs | hasChangeIn cs (Map.elems released) -> ExitFailure 1
@@ -291,7 +299,7 @@ apiCommand env opts a = do
 run :: Options -> IO ExitCode
 run opts = do
     args <- refArgs opts
-    _ <- visibility opts -- report conflicting flags before any work
+    _ <- renderOptions opts -- report conflicting flags before any work
     let bc = BuildConfig (optCompiler opts) (optCabalOptions opts)
     checkPrograms
         (requiredPrograms bc (optInPlace opts)

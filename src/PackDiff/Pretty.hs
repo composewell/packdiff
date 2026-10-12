@@ -255,6 +255,17 @@ declLines visible qual lvl dd
                       else []
             (c, _, _) -> [sigilLine lvl c (qual d (declText d))]
 
+-- | The declarations of a module and their children, all marked with the
+-- same sigil.
+moduleSymbolLines :: Change -> Int -> Module -> [Line]
+moduleSymbolLines c lvl m = concatMap decl (Map.elems (moduleDecls m))
+
+    where
+
+    decl d =
+        sigilLine lvl c (declText d)
+            : map (sigilLine (lvl + 1) c . childText) (declChildren d)
+
 symbols :: Int -> String
 symbols 1 = "(1 symbol)"
 symbols n = "(" ++ show n ++ " symbols)"
@@ -280,7 +291,10 @@ data GroupBy
 data RenderOptions = RenderOptions
     { roGroupBy :: GroupBy
     , roQuiet :: Bool
-    , roModulesOnly :: Bool
+    , roCollapse :: Bool
+      -- ^ Print only the module lines.
+    , roExpand :: Bool
+      -- ^ List the symbols of added and removed modules.
     , roVisible :: Change -> Bool
     }
 
@@ -289,18 +303,28 @@ defaultRenderOptions =
     RenderOptions
         { roGroupBy = GroupByModule
         , roQuiet = False
-        , roModulesOnly = False
+        , roCollapse = False
+        , roExpand = False
         , roVisible = const True
         }
+
+-- | The module line of an added or removed module, followed by its symbols
+-- with @--expand@.
+addedRemovedLines :: RenderOptions -> ModuleName -> ModuleDiff -> [Line]
+addedRemovedLines ro name md =
+    moduleLine 0 name md
+        : if roExpand ro
+          then moduleSymbolLines (mdChange md) 1 (moduleDiffModule md)
+          else []
 
 -- | Lines of one module in the output grouped by module.
 moduleLines :: RenderOptions -> ModuleName -> ModuleDiff -> [Line]
 moduleLines ro name md =
     case mdChange md of
         c | c `elem` [Added, Removed] ->
-            [moduleLine 0 name md | visible c]
+            if visible c then addedRemovedLines ro name md else []
         c | visible c && c /= Changed || not (null decls) ->
-            moduleLine 0 name md : if roModulesOnly ro then [] else decls
+            moduleLine 0 name md : if roCollapse ro then [] else decls
         _ -> []
 
     where
@@ -349,12 +373,13 @@ groupedByChange ro diff =
         where
 
         modItems =
-            [ moduleLine 0 name md
+            [ l
             | visible c, c /= Changed, (name, md) <- mods, mdChange md == c
+            , l <- addedRemovedLines ro name md
             ]
         declItems =
             [ l
-            | not (roModulesOnly ro)
+            | not (roCollapse ro)
             , (name, md) <- mods
             , dd <- mdDecls md
             , ddChange dd == c
@@ -430,13 +455,7 @@ renderDiff ro released internal =
 
 apiModuleLines :: ModuleName -> Module -> [Line]
 apiModuleLines name m =
-    sigilLine 0 Added name : concatMap decl (Map.elems (moduleDecls m))
-
-    where
-
-    decl d =
-        sigilLine 1 Added (declText d)
-            : map (sigilLine 2 Added . childText) (declChildren d)
+    sigilLine 0 Added name : moduleSymbolLines Added 1 m
 
 -- | The API of released and internal modules in the tree format, with every
 -- entity marked @[+]@.

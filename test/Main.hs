@@ -229,8 +229,17 @@ prettySpec = describe "Pretty" $ do
             >>= golden "diff-show-added"
 
     it "renders module lines only" $
-        renderTestDiff defaultRenderOptions { roModulesOnly = True }
-            >>= golden "diff-modules-only"
+        renderTestDiff defaultRenderOptions { roCollapse = True }
+            >>= golden "diff-collapse"
+
+    it "renders the symbols of added and removed modules" $
+        renderTestDiff defaultRenderOptions { roExpand = True }
+            >>= golden "diff-expand"
+
+    it "renders the symbols of added and removed modules grouped by change" $
+        renderTestDiff
+            defaultRenderOptions { roExpand = True, roGroupBy = GroupByChange }
+            >>= golden "diff-expand-group-by-change"
 
     it "renders only the summary when quiet" $
         renderTestDiff defaultRenderOptions { roQuiet = True }

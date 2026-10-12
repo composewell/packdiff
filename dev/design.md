@@ -390,8 +390,10 @@ sigils used in the output. Counts that are zero are omitted, and a line
 whose counts are all zero is omitted. An empty diff prints
 `No API changes.`
 
-`-q` prints only the summary. `--modules-only` prints the module lines
-and the summary.
+`-q` prints only the summary. `--collapse` prints the module lines and
+the summary. `--expand` also lists the symbols of added and removed
+modules under their module lines; `--collapse` and `--expand` cannot be
+used together.
 
 ### Grouping by change
 
@@ -470,7 +472,8 @@ The flags for refs (`--repo`, `--old-repo`, `--new-repo`) and packages
 | `--color <mode>` | Color control: `auto` (default), `always`, `never`. `auto` disables color when `NO_COLOR` is set or stdout is not a terminal. |
 | `--group-by <g>` | `module` (default): changes grouped by module. `change`: one section per change kind, for use in a changelog. See [Grouping by change](#grouping-by-change). |
 | `-q / --quiet` | Print only the summary. |
-| `--modules-only` | Print only the module lines and the summary. |
+| `--collapse` | Print only the module lines and the summary. |
+| `--expand` | Also list the symbols of added and removed modules. |
 
 ### Filtering
 
@@ -499,8 +502,8 @@ Filters apply in this order:
    modules are diffed and printed in their own section, but never count
    towards `--fail-on`.
 2. `--fail-on` is evaluated on the result.
-3. `--show`, `--hide`, `--breaking-only`, `-q` and `--modules-only`
-   affect only what is printed. They do not change the exit code.
+3. `--show`, `--hide`, `--breaking-only`, `-q`, `--collapse` and
+   `--expand` affect only what is printed. They do not change the exit code.
 
 Exit codes:
 

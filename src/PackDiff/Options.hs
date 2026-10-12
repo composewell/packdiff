@@ -65,7 +65,8 @@ data Options = Options
     , optColor :: ColorMode
     , optGroupBy :: GroupBy
     , optQuiet :: Bool
-    , optModulesOnly :: Bool
+    , optCollapse :: Bool
+    , optExpand :: Bool
     , optFormat :: Format
       -- Filtering
     , optShow :: Maybe (Set Change)
@@ -163,7 +164,7 @@ buildOpts =
                         \them out in the current working tree.")
 
 data OutputOpts =
-    OutputOpts ColorMode GroupBy Bool Bool
+    OutputOpts ColorMode GroupBy Bool Bool Bool
         (Maybe (Set Change)) (Maybe (Set Change)) Bool
 
 colorReader :: ReadM ColorMode
@@ -194,8 +195,10 @@ outputOpts =
                 (long "group-by" <> metavar "G" <> value GroupByModule
                     <> help "module (default) or change.")
         <*> switch (short 'q' <> long "quiet" <> help "Print only the summary.")
-        <*> switch (long "modules-only"
+        <*> switch (long "collapse"
                 <> help "Print only the module lines and the summary.")
+        <*> switch (long "expand"
+                <> help "Also list the symbols of added and removed modules.")
         <*> changeSets parseChangeTypes
                 (long "show" <> metavar "TYPES"
                     <> help "Show only these change types: added, removed, \
@@ -246,7 +249,7 @@ mkOptions ::
 mkOptions cmd refs (RepoOpts repo old new) pkg
     (ModuleOpts mods ignores internals)
     (BuildOpts compiler cabalOpts noCache workDir inPlace)
-    (OutputOpts color groupBy quiet modsOnly shw hide breakingOnly)
+    (OutputOpts color groupBy quiet collapse expand shw hide breakingOnly)
     failOn fmt =
     Options
         { optCommand = cmd
@@ -258,7 +261,8 @@ mkOptions cmd refs (RepoOpts repo old new) pkg
         , optColor = color
         , optGroupBy = groupBy
         , optQuiet = quiet
-        , optModulesOnly = modsOnly
+        , optCollapse = collapse
+        , optExpand = expand
         , optFormat = fmt
         , optShow = shw
         , optHide = hide
@@ -276,7 +280,7 @@ mkOptions cmd refs (RepoOpts repo old new) pkg
 
 defaultOutputOpts :: ColorMode -> OutputOpts
 defaultOutputOpts color =
-    OutputOpts color GroupByModule False False Nothing Nothing False
+    OutputOpts color GroupByModule False False False Nothing Nothing False
 
 diffParser :: Parser Options
 diffParser =
