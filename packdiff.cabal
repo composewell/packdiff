@@ -1,25 +1,28 @@
 cabal-version:       2.2
 name:                packdiff
 version:             0.1.0.0
-synopsis: Find API changes between different versions of a package
+synopsis: Find API changes and the required version bump between package versions
 description:
-  Packdiff compares different Git commits or Hackage versions of a package to
-  identify:
+  packdiff tells you what changed in the public API of a Haskell package
+  between two versions, and which version bump the PVP requires for those
+  changes.
   .
-  * Signature changes.
-  * Deprecated functions.
-  * Added or removed functions.
+  * @packdiff diff@ lists the API changes module by module: added,
+    removed, changed and deprecated symbols, with the old and new
+    definition of each changed symbol and the number of breaking changes.
+  * During development, compare @HEAD@ with your working tree to see what
+    your uncommitted edits do to the API.
+  * In CI, run @packdiff diff@ on each pull request to see what the PR
+    changes in the API, and use @--fail-on breaking@ to fail the build on
+    a breaking change.
+  * @packdiff check@ tells you whether a release needs a major, minor or
+    patch bump, and why.
+  * @packdiff check@ returns exit code 1 if the version in the cabal file
+    is lower than required. You can use it to report the problem or to
+    fail the CI build automatically.
   .
-  It helps you to:
-  .
-  * Generate API changelogs automatically.
-  * Generate API diff on pull requests.
-  * Compare new changes against published Hackage releases.
-  * Decide the new version of a package.
-  * Find breaking changes in the new release.
-  .
-  See the README for more details.
-  .
+  The two versions can be git commits, the working tree, Hackage releases
+  or saved hoogle files. You don't need to change your package to use it.
 bug-reports:         https://github.com/composewell/packdiff/issues
 license:             Apache-2.0
 license-file:        LICENSE

@@ -1,9 +1,31 @@
 # packdiff
 
-packdiff compares two versions of a Haskell package and reports the API
-changes: added, removed, changed and deprecated symbols. It builds the
-hoogle file of each version with `cabal haddock` and compares the two
-files. Only exposed modules are compared.
+packdiff tells you what changed in the public API of a Haskell package
+between two versions, and which version bump the
+[PVP](https://pvp.haskell.org/) requires for those changes.
+
+* `packdiff diff` lists the API changes module by module: added, removed,
+  changed, deprecated and undeprecated symbols, with the old and new
+  definition of each changed symbol. The summary at the end gives the
+  number of breaking changes.
+* During development, `packdiff diff` with no arguments compares `HEAD`
+  with your working tree, so you can see what your uncommitted edits do to
+  the API before you commit.
+* In CI, run `packdiff diff` on each pull request against the base
+  branch or the latest Hackage release. The build log then shows what the
+  PR changes in the API, and `--fail-on breaking` fails the build if any
+  change is breaking.
+* `packdiff check` tells you whether a release needs a major, minor or
+  patch bump, and why. For example: `breaking changes between v1.2.0
+  (1.2.0.0) and . (1.2.0.0): bump major (1.3.0.0)`.
+* `packdiff check` returns exit code 1 if the version in the cabal file is
+  lower than required. You can use it to report the problem or to fail the
+  CI build automatically.
+
+The two versions can be git commits, the working tree, Hackage releases
+or saved hoogle files. packdiff builds the hoogle file of each version
+with `cabal haddock` and compares them. Only exposed modules are compared.
+You don't need to change your package to use it.
 
 ## Usage
 
