@@ -100,35 +100,41 @@ changeSets parse m =
     combine [] = Nothing
     combine xs = Just (Set.unions xs)
 
-data RepoOpts = RepoOpts (Maybe String) (Maybe String) (Maybe String)
+-- | @--repo@, @--old-repo@, @--new-repo@ and @--package@.
+data SourceOpts =
+    SourceOpts (Maybe String) (Maybe String) (Maybe String) (Maybe String)
 
-repoOpt :: Parser (Maybe String)
-repoOpt =
-    optional $ strOption $
-        long "repo" <> metavar "PATH-OR-URL"
-            <> help "Repository for git refs. Default: the repository of the \
-                    \current directory."
+-- | The source options. @--old-repo@ and @--new-repo@ only for commands
+-- that take two refs.
+sourceOpts :: Bool -> Parser SourceOpts
+sourceOpts twoRefs =
+    parserOptionGroup "Source options:" $
+        SourceOpts
+            <$> optional (strOption $
+                    long "repo" <> metavar "PATH-OR-URL"
+                        <> help "Repository for git refs. Default: the \
+                                \repository of the current directory.")
+            <*> refRepo "old-repo" "REF1"
+            <*> refRepo "new-repo" "REF2"
+            <*> optional (strOption $
+                    short 'p' <> long "package" <> metavar "NAME"
+                        <> help "Package to compare, for repositories with \
+                                \several packages.")
 
-oldNewRepoOpts :: Parser (Maybe String, Maybe String)
-oldNewRepoOpts =
-    (,)
-        <$> optional (strOption $
-                long "old-repo" <> metavar "PATH-OR-URL"
-                    <> help "Repository for REF1 only.")
-        <*> optional (strOption $
-                long "new-repo" <> metavar "PATH-OR-URL"
-                    <> help "Repository for REF2 only.")
+    where
 
-packageOpt :: Parser (Maybe String)
-packageOpt =
-    optional $ strOption $
-        short 'p' <> long "package" <> metavar "NAME"
-            <> help "Package to compare, for repositories with several packages."
+    refRepo name ref
+        | twoRefs =
+            optional $ strOption $
+                long name <> metavar "PATH-OR-URL"
+                    <> help ("Repository for " ++ ref ++ " only.")
+        | otherwise = pure Nothing
 
 data ModuleOpts = ModuleOpts [Glob] [Glob] [Glob]
 
 moduleOpts :: Parser ModuleOpts
 moduleOpts =
+    parserOptionGroup "Module selection:" $
     ModuleOpts
         <$> many (strOption $
                 long "module" <> metavar "GLOB"
@@ -145,6 +151,7 @@ data BuildOpts = BuildOpts (Maybe String) [String] Bool (Maybe FilePath) Bool
 
 buildOpts :: Parser BuildOpts
 buildOpts =
+    parserOptionGroup "Build options:" $
     BuildOpts
         <$> optional (strOption $
                 short 'w' <> long "with-compiler" <> metavar "GHC"
@@ -163,9 +170,7 @@ buildOpts =
                 <> help "Build git refs of the current repository by checking \
                         \them out in the current working tree.")
 
-data OutputOpts =
-    OutputOpts ColorMode GroupBy Bool Bool Bool
-        (Maybe (Set Change)) (Maybe (Set Change)) Bool
+data OutputOpts = OutputOpts ColorMode GroupBy Bool Bool Bool
 
 colorReader :: ReadM ColorMode
 colorReader = eitherReader $ \case
@@ -189,6 +194,7 @@ colorOpt =
 
 outputOpts :: Parser OutputOpts
 outputOpts =
+    parserOptionGroup "Output options:" $
     OutputOpts
         <$> colorOpt
         <*> option groupByReader
@@ -199,7 +205,16 @@ outputOpts =
                 <> help "Print only the module lines and the summary.")
         <*> switch (long "expand"
                 <> help "Also list the symbols of added and removed modules.")
-        <*> changeSets parseChangeTypes
+
+-- | @--show@, @--hide@, @--breaking-only@ and @--fail-on@.
+data FilterOpts =
+    FilterOpts (Maybe (Set Change)) (Maybe (Set Change)) Bool (Maybe (Set Change))
+
+filterOpts :: Parser FilterOpts
+filterOpts =
+    parserOptionGroup "Change filters:" $
+    FilterOpts
+        <$> changeSets parseChangeTypes
                 (long "show" <> metavar "TYPES"
                     <> help "Show only these change types: added, removed, \
                             \changed, deprecated, undeprecated.")
@@ -207,13 +222,11 @@ outputOpts =
                 (long "hide" <> metavar "TYPES" <> help "Hide these change types.")
         <*> switch (long "breaking-only"
                 <> help "Shorthand for --show removed,changed.")
-
-failOnOpt :: Parser (Maybe (Set Change))
-failOnOpt =
-    changeSets parseFailOn
-        (long "fail-on" <> metavar "TYPES"
-            <> help "Exit with 1 if the diff contains a change of these types. \
-                    \Same values as --show, plus breaking and any.")
+        <*> changeSets parseFailOn
+                (long "fail-on" <> metavar "TYPES"
+                    <> help "Exit with 1 if the diff contains a change of \
+                            \these types. Same values as --show, plus \
+                            \breaking and any.")
 
 formatOpt :: Parser Format
 formatOpt =
@@ -238,19 +251,18 @@ refsArg meta = many (strArgument (metavar meta))
 mkOptions ::
        Command
     -> [String]
-    -> RepoOpts
-    -> Maybe String
+    -> SourceOpts
     -> ModuleOpts
     -> BuildOpts
     -> OutputOpts
-    -> Maybe (Set Change)
+    -> FilterOpts
     -> Format
     -> Options
-mkOptions cmd refs (RepoOpts repo old new) pkg
+mkOptions cmd refs (SourceOpts repo old new pkg)
     (ModuleOpts mods ignores internals)
     (BuildOpts compiler cabalOpts noCache workDir inPlace)
-    (OutputOpts color groupBy quiet collapse expand shw hide breakingOnly)
-    failOn fmt =
+    (OutputOpts color groupBy quiet collapse expand)
+    (FilterOpts shw hide breakingOnly failOn) fmt =
     Options
         { optCommand = cmd
         , optRefs = refs
@@ -279,46 +291,42 @@ mkOptions cmd refs (RepoOpts repo old new) pkg
         }
 
 defaultOutputOpts :: ColorMode -> OutputOpts
-defaultOutputOpts color =
-    OutputOpts color GroupByModule False False False Nothing Nothing False
+defaultOutputOpts color = OutputOpts color GroupByModule False False False
+
+noFilterOpts :: FilterOpts
+noFilterOpts = FilterOpts Nothing Nothing False Nothing
 
 diffParser :: Parser Options
 diffParser =
-    (\refs repo (old, new) -> mkOptions CmdDiff refs (RepoOpts repo old new))
+    mkOptions CmdDiff
         <$> refsArg "[REF1 [REF2]]"
-        <*> repoOpt
-        <*> oldNewRepoOpts
-        <*> packageOpt
+        <*> sourceOpts True
         <*> moduleOpts
         <*> buildOpts
         <*> outputOpts
-        <*> failOnOpt
+        <*> filterOpts
         <*> pure FormatText
 
 checkParser :: Parser Options
 checkParser =
-    (\refs repo (old, new) pkg mods bld ->
-        mkOptions CmdCheck refs (RepoOpts repo old new) pkg mods bld
-            (defaultOutputOpts ColorNever) Nothing FormatText)
+    (\refs src mods bld ->
+        mkOptions CmdCheck refs src mods bld
+            (defaultOutputOpts ColorNever) noFilterOpts FormatText)
         <$> refsArg "[REF1 [REF2]]"
-        <*> repoOpt
-        <*> oldNewRepoOpts
-        <*> packageOpt
+        <*> sourceOpts True
         <*> moduleOpts
         <*> buildOpts
 
 apiParser :: Parser Options
 apiParser =
-    (\refs repo pkg mods bld color fmt ->
-        mkOptions CmdApi refs (RepoOpts repo Nothing Nothing) pkg mods bld
-            (defaultOutputOpts color) Nothing fmt)
+    (\refs src mods bld (color, fmt) ->
+        mkOptions CmdApi refs src mods bld
+            (defaultOutputOpts color) noFilterOpts fmt)
         <$> refsArg "[REF]"
-        <*> repoOpt
-        <*> packageOpt
+        <*> sourceOpts False
         <*> moduleOpts
         <*> buildOpts
-        <*> colorOpt
-        <*> formatOpt
+        <*> parserOptionGroup "Output options:" ((,) <$> colorOpt <*> formatOpt)
 
 usageFooter :: InfoMod a
 usageFooter =
@@ -335,17 +343,21 @@ usageFooter =
         , "obtain an API."
         ]
 
+-- | A command with @--help@ under "Help options:", instead of the
+-- "Available options:" section that 'hsubparser' would create for it.
+commandWithHelp :: String -> Parser Options -> String -> Mod CommandFields Options
+commandWithHelp name p desc =
+    command name
+        (info (p <**> parserOptionGroup "Help options:" helper)
+            (progDesc desc <> usageFooter))
+
 commandParser :: Parser Options
 commandParser =
-    hsubparser $
-        command "diff"
-            (info diffParser
-                (progDesc "Print the API diff between two refs." <> usageFooter))
-        <> command "check"
-            (info checkParser
-                (progDesc "Print the version bump required by the diff." <> usageFooter))
-        <> command "api"
-            (info apiParser (progDesc "Print the API of a single ref." <> usageFooter))
+    subparser $
+        commandWithHelp "diff" diffParser "Print the API diff between two refs."
+        <> commandWithHelp "check" checkParser
+            "Print the version bump required by the diff."
+        <> commandWithHelp "api" apiParser "Print the API of a single ref."
 
 parserInfo :: ParserInfo Options
 parserInfo =

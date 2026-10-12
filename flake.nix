@@ -11,9 +11,7 @@
     basepkgs.nixpack.mkOutputs {
       inherit nixpkgs nixpkgs-darwin basepkgs;
       name = "packdiff";
-      sources = basepkgs.nixpack.lib.localSource "packdiff" ./.;
+      sources = import ./sources.nix;
       packages = basepkgs.nixpack.lib.devPackage "packdiff";
-      #sources = import ./sources.nix;
-      #packages = import ./packages.nix;
     };
 }
